@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
-import DemoVideoSelector from "./DemoVideoSelector.jsx";
 import {
   Navigate,
   Route,
@@ -100,71 +99,15 @@ function LoginPage({ user, setUser }) {
 function RegisterCattleModal({ onClose, onRegistered }) {
   const [earTagImage, setEarTagImage] = useState(null);
   const [muzzleImage, setMuzzleImage] = useState(null);
-  const [earTagNumber, setEarTagNumber] = useState("");
-  const [ocrStatus, setOcrStatus] = useState("idle");
-  const [ocrMessage, setOcrMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-
-  const handleEarTagImageChange = async (event) => {
-    const file = event.target.files?.[0] ?? null;
-
-    setEarTagImage(file);
-    setEarTagNumber("");
-    setOcrMessage("");
-    setErrorMessage("");
-
-    if (!file) {
-      setOcrStatus("idle");
-      return;
-    }
-
-    setOcrStatus("loading");
-
-    try {
-      const formData = new FormData();
-      formData.append("ear_tag_image", file);
-
-      const response = await fetch(`${API_BASE_URL}/ocr/ear-tag`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.detail ?? "귀표 번호 인식에 실패했습니다.",
-        );
-      }
-
-      setEarTagNumber(result.ear_tag_number ?? "");
-      setOcrStatus("success");
-      setOcrMessage(
-        "사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.",
-      );
-    } catch (error) {
-      console.error("귀표 OCR 오류:", error);
-      setOcrStatus("error");
-      setOcrMessage(
-        "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
-      );
-    }
-  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
 
-    const normalizedEarTagNumber = earTagNumber.trim();
-
     if (!earTagImage) {
       setErrorMessage("귀표 사진을 선택해 주세요.");
-      return;
-    }
-
-    if (!normalizedEarTagNumber) {
-      setErrorMessage("귀표 번호를 확인하거나 직접 입력해 주세요.");
       return;
     }
 
@@ -178,10 +121,6 @@ function RegisterCattleModal({ onClose, onRegistered }) {
     try {
       const formData = new FormData();
 
-      formData.append(
-        "ear_tag_number",
-        normalizedEarTagNumber,
-      );
       formData.append("ear_tag_image", earTagImage);
       formData.append("muzzle_image", muzzleImage);
 
@@ -233,7 +172,9 @@ function RegisterCattleModal({ onClose, onRegistered }) {
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              onChange={handleEarTagImageChange}
+              onChange={(event) => {
+                setEarTagImage(event.target.files?.[0] ?? null);
+              }}
               required
             />
 
@@ -243,60 +184,6 @@ function RegisterCattleModal({ onClose, onRegistered }) {
               </span>
             )}
           </label>
-
-          {earTagImage && (
-            <label className="ocr-result-field">
-              귀표 번호
-
-              <span className="upload-description">
-                자동 인식 결과를 확인하고 틀리면 수정해 주세요.
-              </span>
-
-              <div className="ocr-input-wrapper">
-                <input
-                  className="ocr-result-input"
-                  type="text"
-                  value={earTagNumber}
-                  onChange={(event) => {
-                    setEarTagNumber(event.target.value);
-                  }}
-                  placeholder={
-                    ocrStatus === "loading"
-                      ? "귀표 번호 인식 중..."
-                      : "귀표 번호를 입력해 주세요."
-                  }
-                  disabled={ocrStatus === "loading"}
-                  required
-                />
-
-                {ocrStatus === "loading" && (
-                  <span className="ocr-status-badge loading">
-                    분석 중
-                  </span>
-                )}
-
-                {ocrStatus === "success" && (
-                  <span className="ocr-status-badge success">
-                    자동 인식
-                  </span>
-                )}
-
-                {ocrStatus === "error" && (
-                  <span className="ocr-status-badge error">
-                    직접 입력
-                  </span>
-                )}
-              </div>
-
-              {ocrMessage && (
-                <span
-                  className={`ocr-message ${ocrStatus}`}
-                >
-                  {ocrMessage}
-                </span>
-              )}
-            </label>
-          )}
 
           <label className="image-upload-field">
             비문 사진
@@ -328,11 +215,9 @@ function RegisterCattleModal({ onClose, onRegistered }) {
           <button
             className="register-submit-button"
             type="submit"
-            disabled={
-              isSubmitting || ocrStatus === "loading"
-            }
+            disabled={isSubmitting}
           >
-            {isSubmitting ? "등록 중..." : "등록하기"}
+            {isSubmitting ? "사진 분석 및 등록 중..." : "등록하기"}
           </button>
         </form>
       </section>
@@ -340,7 +225,7 @@ function RegisterCattleModal({ onClose, onRegistered }) {
   );
 }
 
-function AnomalyDashboard({ demoResult }) {
+function AnomalyDashboard() {
   const [anomalies, setAnomalies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -475,8 +360,6 @@ function AnomalyDashboard({ demoResult }) {
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [demoInferenceResult, setDemoInferenceResult] = useState(null);
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -495,12 +378,13 @@ function DashboardPage({ user, setUser }) {
     <main className="dashboard-page">
       <header className="dashboard-header">
         <div>
-          <p className="dashboard-subtitle dashboard-title">
+          <p className="dashboard-subtitle">
             한우 모니터링 시스템
           </p>
+          <h1>대시보드</h1>
         </div>
 
-                <div className="header-actions header-actions-right">
+        <div className="header-actions">
           <button
             className="register-cattle-button"
             type="button"
@@ -509,51 +393,39 @@ function DashboardPage({ user, setUser }) {
             + 소 등록하기
           </button>
 
-          <div className="profile-menu-wrapper">
-            <button
-              className="header-user profile-menu-button"
-              type="button"
-              onClick={() => {
-                setIsProfileMenuOpen((previous) => !previous);
-              }}
-              aria-expanded={isProfileMenuOpen}
-            >
-              {user.picture ? (
-                <img
-                  className="header-profile-image"
-                  src={user.picture}
-                  alt="사용자 프로필"
-                  referrerPolicy="no-referrer"
-                />
-              ) : (
-                <div className="header-guest-profile">G</div>
-              )}
-
-              <div className="header-user-info">
-                <strong>{user.name}</strong>
-                <span>{user.email}</span>
-              </div>
-
-              <span className="profile-menu-arrow">
-                {isProfileMenuOpen ? "▲" : "▼"}
-              </span>
-            </button>
-
-            {isProfileMenuOpen && (
-              <div className="profile-dropdown">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                >
-                  로그아웃
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            className="logout-button header-logout"
+            type="button"
+            onClick={handleLogout}
+          >
+            로그아웃
+          </button>
         </div>
       </header>
-<DemoVideoSelector />
-<AnomalyDashboard />
+
+      <section className="user-card">
+        {user.picture ? (
+          <img
+            className="profile-image"
+            src={user.picture}
+            alt="사용자 프로필"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="guest-profile">G</div>
+        )}
+
+        <div>
+          <h2>{user.name}</h2>
+          <p>{user.email}</p>
+
+          {user.loginType === "guest" && (
+            <span className="guest-badge">게스트 모드</span>
+          )}
+        </div>
+      </section>
+
+      <AnomalyDashboard />
 
       {isRegisterOpen && (
         <RegisterCattleModal

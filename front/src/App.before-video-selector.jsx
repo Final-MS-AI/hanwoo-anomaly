@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
-import DemoVideoSelector from "./DemoVideoSelector.jsx";
 import {
   Navigate,
   Route,
@@ -340,7 +339,7 @@ function RegisterCattleModal({ onClose, onRegistered }) {
   );
 }
 
-function AnomalyDashboard({ demoResult }) {
+function AnomalyDashboard() {
   const [anomalies, setAnomalies] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
@@ -476,7 +475,6 @@ function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
   const [isRegisterOpen, setIsRegisterOpen] = useState(false);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [demoInferenceResult, setDemoInferenceResult] = useState(null);
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -552,7 +550,6 @@ function DashboardPage({ user, setUser }) {
           </div>
         </div>
       </header>
-<DemoVideoSelector />
 <AnomalyDashboard />
 
       {isRegisterOpen && (

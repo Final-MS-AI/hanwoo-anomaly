@@ -1,0 +1,387 @@
+import { useEffect, useRef, useState } from "react";
+
+const DEMO_VIDEOS = [
+  {
+    id: "normal",
+    title: "일반 축사 영상",
+    description: "여러 개체의 일상 행동을 추적하는 시연 영상입니다.",
+    videoUrl: "",
+  },
+  {
+    id: "abnormal",
+    title: "이상 개체 포함 영상",
+    description: "여러 소 중 이상 징후가 있는 개체를 탐지합니다.",
+    videoUrl: "",
+  },
+];
+
+const STATUS_LABELS = {
+  idle: "대기",
+  uploading: "영상 전송 중",
+  detecting: "개체 탐지 중",
+  tracking: "개체 추적 중",
+  analyzing: "행동 분석 중",
+  completed: "분석 완료",
+};
+
+function DemoVideoSelector({ onInferenceComplete }) {
+  const [isSelectorOpen, setIsSelectorOpen] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [jobStatus, setJobStatus] = useState("idle");
+  const [progress, setProgress] = useState(0);
+  const [detectedCattle, setDetectedCattle] = useState([]);
+  const timerRef = useRef(null);
+
+  const isRunning = [
+    "uploading",
+    "detecting",
+    "tracking",
+    "analyzing",
+  ].includes(jobStatus);
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
+
+  const handleSelectVideo = (video) => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+
+    setSelectedVideo(video);
+    setJobStatus("idle");
+    setProgress(0);
+    setDetectedCattle([]);
+    setIsSelectorOpen(false);
+  };
+
+  const handleStartInference = () => {
+    if (!selectedVideo || isRunning) {
+      return;
+    }
+
+    setProgress(0);
+    setDetectedCattle([]);
+    setJobStatus("uploading");
+
+    let currentProgress = 0;
+
+    timerRef.current = setInterval(() => {
+      currentProgress += 1;
+
+      if (currentProgress >= 12 && currentProgress < 35) {
+        setJobStatus("detecting");
+      }
+
+      if (currentProgress >= 35 && currentProgress < 65) {
+        setJobStatus("tracking");
+      }
+
+      if (currentProgress >= 65 && currentProgress < 100) {
+        setJobStatus("analyzing");
+      }
+
+      if (currentProgress >= 100) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+
+        const result =
+          selectedVideo.id === "abnormal"
+            ? [
+                {
+                  cattleId: "COW-01",
+                  trackId: 1,
+                  behavior: "정상 활동",
+                  status: "normal",
+                  confidence: 0.95,
+                },
+                {
+                  cattleId: "COW-02",
+                  trackId: 2,
+                  behavior: "장시간 누움",
+                  status: "warning",
+                  confidence: 0.91,
+                },
+                {
+                  cattleId: "COW-03",
+                  trackId: 3,
+                  behavior: "이동량 감소",
+                  status: "warning",
+                  confidence: 0.87,
+                },
+              ]
+            : [
+                {
+                  cattleId: "COW-01",
+                  trackId: 1,
+                  behavior: "정상 활동",
+                  status: "normal",
+                  confidence: 0.96,
+                },
+                {
+                  cattleId: "COW-02",
+                  trackId: 2,
+                  behavior: "정상 활동",
+                  status: "normal",
+                  confidence: 0.94,
+                },
+                {
+                  cattleId: "COW-03",
+                  trackId: 3,
+                  behavior: "반추 중",
+                  status: "normal",
+                  confidence: 0.92,
+                },
+              ];
+
+        setProgress(100);
+        setJobStatus("completed");
+        setDetectedCattle(result);
+
+        if (onInferenceComplete) {
+          onInferenceComplete({
+            videoId: selectedVideo.id,
+            cattle: result,
+            anomalies: result.filter(
+              (item) => item.status === "warning",
+            ),
+          });
+        }
+
+        return;
+      }
+
+      setProgress(currentProgress);
+    }, 180);
+  };
+
+  const handleReset = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    setSelectedVideo(null);
+    setJobStatus("idle");
+    setProgress(0);
+    setDetectedCattle([]);
+    setIsSelectorOpen(false);
+  };
+
+  return (
+    <section className="inference-section">
+      <div className="inference-header">
+        <div>
+          <p className="section-label">카메라 대체 시연</p>
+          <h2>다개체 행동 탐지</h2>
+          <p className="inference-description">
+            영상 속 여러 소를 탐지하고 추적한 뒤,
+            개체별 행동 이상 징후를 분석합니다.
+          </p>
+        </div>
+
+        <button
+          className="video-select-button"
+          type="button"
+          disabled={isRunning}
+          onClick={() => {
+            setIsSelectorOpen((previous) => !previous);
+          }}
+        >
+          {selectedVideo ? "영상 변경" : "영상 선택"}
+        </button>
+      </div>
+
+      {isSelectorOpen && (
+        <div className="video-option-list">
+          {DEMO_VIDEOS.map((video) => (
+            <button
+              className="video-option-card"
+              type="button"
+              key={video.id}
+              onClick={() => handleSelectVideo(video)}
+            >
+              <div className="video-option-thumbnail">
+                <span className="video-play-icon">▶</span>
+              </div>
+
+              <div className="video-option-info">
+                <strong>{video.title}</strong>
+                <p>{video.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {!selectedVideo && !isSelectorOpen && (
+        <div className="inference-empty">
+          
+          <strong>분석할 축사 영상을 선택해 주세요.</strong>
+          <p>
+            영상 속 여러 소를 탐지하고 개체별 이상 징후를 표시합니다.
+          </p>
+        </div>
+      )}
+
+      {selectedVideo && (
+        <div className="inference-workspace">
+          <div className="inference-video-panel">
+            {selectedVideo.videoUrl ? (
+              <video
+                className="inference-video"
+                src={selectedVideo.videoUrl}
+                controls
+              />
+            ) : (
+              <div className="video-placeholder">
+                <strong>{selectedVideo.title}</strong>
+                <p>추론 결과 영상 연결 예정</p>
+
+                {jobStatus === "completed" && (
+                  <div className="mock-detection-layer">
+                    <div className="mock-box cow-one">
+                      <span>ID 1 · 정상</span>
+                    </div>
+
+                    <div
+                      className={`mock-box cow-two ${
+                        selectedVideo.id === "abnormal"
+                          ? "warning"
+                          : ""
+                      }`}
+                    >
+                      <span>
+                        ID 2 ·{" "}
+                        {selectedVideo.id === "abnormal"
+                          ? "장시간 누움"
+                          : "정상"}
+                      </span>
+                    </div>
+
+                    <div
+                      className={`mock-box cow-three ${
+                        selectedVideo.id === "abnormal"
+                          ? "warning"
+                          : ""
+                      }`}
+                    >
+                      <span>
+                        ID 3 ·{" "}
+                        {selectedVideo.id === "abnormal"
+                          ? "이동량 감소"
+                          : "반추 중"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isRunning && (
+              <div className="inference-overlay">
+                <div className="scanner-line" />
+                <span>{STATUS_LABELS[jobStatus]}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="inference-control-panel">
+            <div className="selected-video-summary">
+              <h3>{selectedVideo.title}</h3>
+              <p>{selectedVideo.description}</p>
+            </div>
+
+            <div className="job-status-box">
+              <div className="job-status-row">
+                <span>처리 단계</span>
+                <strong>{STATUS_LABELS[jobStatus]}</strong>
+              </div>
+
+              <div className="progress-track">
+                <div
+                  className="progress-value"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              <div className="progress-text">
+                <span>{progress}%</span>
+                <span>
+                  {jobStatus === "detecting" &&
+                    "소 객체 탐지"}
+                  {jobStatus === "tracking" &&
+                    "Track ID 유지"}
+                  {jobStatus === "analyzing" &&
+                    "개체별 행동 분석"}
+                  {jobStatus === "completed" &&
+                    "분석 완료"}
+                </span>
+              </div>
+            </div>
+
+            {detectedCattle.length > 0 && (
+              <div className="detected-cattle-list">
+                <div className="detected-cattle-header">
+                  <span>개체별 분석 결과</span>
+                  <strong>
+                    {detectedCattle.length}마리 탐지
+                  </strong>
+                </div>
+
+                {detectedCattle.map((item) => (
+                  <article
+                    className={`detected-cattle-item ${item.status}`}
+                    key={item.trackId}
+                  >
+                    <div>
+                      <strong>{item.cattleId}</strong>
+                      <span>Track ID {item.trackId}</span>
+                    </div>
+
+                    <div className="detected-behavior">
+                      <strong>{item.behavior}</strong>
+                      <span>
+                        {Math.round(item.confidence * 100)}%
+                      </span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            <div className="inference-actions">
+              <button
+                className="start-inference-button"
+                type="button"
+                disabled={isRunning}
+                onClick={handleStartInference}
+              >
+                {isRunning
+                  ? STATUS_LABELS[jobStatus]
+                  : jobStatus === "completed"
+                    ? "다시 분석하기"
+                    : "영상 분석 시작"}
+              </button>
+
+              <button
+                className="reset-inference-button"
+                type="button"
+                disabled={isRunning}
+                onClick={handleReset}
+              >
+                선택 해제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default DemoVideoSelector;
