@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import "./App.css";
 
 function App() {
@@ -11,15 +11,26 @@ function App() {
     setMessage("");
 
     try {
-      const response = await fetch("http://20.194.30.236:8000/db-test");
-      const result = await response.json();
+      const response = await fetch("/api/health");
 
       if (!response.ok) {
-        throw new Error(result.detail || "DB 조회 실패");
+        throw new Error(`HTTP 오류: ${response.status}`);
       }
 
-      setRows(result.data || []);
-      setMessage(`${result.count ?? 0}개의 데이터를 불러왔습니다.`);
+      const text = await response.text();
+
+      if (!text) {
+        throw new Error("서버 응답이 비어 있습니다.");
+      }
+
+      const result = JSON.parse(text);
+
+      if (result.status === "healthy") {
+        setRows([]);
+        setMessage("FastAPI 서버 연결 성공");
+      } else {
+        throw new Error("서버 상태가 정상적이지 않습니다.");
+      }
     } catch (error) {
       setRows([]);
       setMessage(`연결 실패: ${error.message}`);
@@ -31,14 +42,18 @@ function App() {
   return (
     <main className="page">
       <section className="card">
-        <h1>한우 모니터링 DB 테스트</h1>
+        <h1>한우모니터링 서버 테스트</h1>
 
         <p className="description">
-          버튼을 누르면 DB 데이터를 화면에 표시합니다.
+          버튼을 누르면 FastAPI 서버 연결 상태를 확인합니다.
         </p>
 
-        <button onClick={loadDatabase} disabled={loading}>
-          {loading ? "조회 중..." : "DB 연결 및 조회"}
+        <button
+          type="button"
+          onClick={loadDatabase}
+          disabled={loading}
+        >
+          {loading ? "확인 중..." : "서버 연결 확인"}
         </button>
 
         {message && <p className="status">{message}</p>}
@@ -76,3 +91,4 @@ function App() {
 }
 
 export default App;
+EOF
