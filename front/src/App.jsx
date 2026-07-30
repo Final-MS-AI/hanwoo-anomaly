@@ -11,7 +11,7 @@ function App() {
     setMessage("");
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/db-test");
+      const response = await fetch("http://20.123.45.67:8000/db-test");
       const result = await response.json();
 
       if (!response.ok) {
