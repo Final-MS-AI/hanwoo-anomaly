@@ -63,3 +63,8 @@
     flex-direction: column;
   }
 }
+
+
+.kakao-login-image-button {
+  text-decoration: none;
+}

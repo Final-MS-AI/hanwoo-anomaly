@@ -92,17 +92,16 @@ function LoginPage({ user, setUser }) {
             />
                   </div>
 
-        <button
+        <a
             className="kakao-login-image-button"
-            type="button"
-            onClick={handleKakaoLogin}
+            href={`${API_BASE_URL}/auth/kakao/login`}
             aria-label="??? ???"
           >
             <img
               src="/kakao-login.png"
               alt="??? ???"
             />
-          </button>
+          </a>
         </div>
 
         <div className="login-divider">
