@@ -12,7 +12,7 @@ import {
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
-  "http://20.194.30.236:8000";
+  "https://hanwoo.koreacentral.cloudapp.azure.com";
 
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
@@ -86,7 +86,7 @@ function LoginPage({ user, setUser }) {
 
         <a
             className="kakao-login-image-button"
-            href="http://20.194.30.236:8000/auth/kakao/login"
+            href="https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login"
             aria-label="??? ???"
           >
             <img
