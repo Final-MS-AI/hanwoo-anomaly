@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
+import "./kakao-login.css";
 import {
   Navigate,
   Route,
@@ -9,7 +10,9 @@ import {
   useNavigate,
 } from "react-router-dom";
 
-const API_BASE_URL = "http://20.194.30.236:8000";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "http://20.194.30.236:8000";
 
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
@@ -36,7 +39,7 @@ function LoginPage({ user, setUser }) {
       setErrorMessage("");
       navigate("/dashboard");
     } catch (error) {
-      console.error("Google 로그인 처리 오류:", error);
+      console.error("Login processing error:", error);
       setErrorMessage("로그인 정보를 처리하지 못했습니다.");
     }
   };
@@ -53,6 +56,14 @@ function LoginPage({ user, setUser }) {
     navigate("/dashboard");
   };
 
+  const handleKakaoLogin = () => {
+    setErrorMessage("");
+
+    window.location.assign(
+      `${API_BASE_URL}/auth/kakao/login`,
+    );
+  };
+
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -65,16 +76,33 @@ function LoginPage({ user, setUser }) {
         <h1>한우 행동 이상 탐지</h1>
 
         <p className="description">
-          Google 계정으로 로그인하거나 게스트로 체험해 보세요.
+          Google 또는 카카오 계정으로 로그인하거나 게스트로 체험해 보세요.
         </p>
 
-        <div className="google-login">
-          <GoogleLogin
-            onSuccess={handleGoogleLogin}
-            onError={() => {
-              setErrorMessage("Google 로그인에 실패했습니다.");
-            }}
-          />
+        <div className="social-login-buttons">
+          <div className="google-login">
+                    <GoogleLogin
+              onSuccess={handleGoogleLogin}
+              onError={() => {
+                setErrorMessage("Google ???? ??????.");
+              }}
+              text="signin"
+              locale="ko"
+              size="medium"
+            />
+                  </div>
+
+        <button
+            className="kakao-login-image-button"
+            type="button"
+            onClick={handleKakaoLogin}
+            aria-label="??? ???"
+          >
+            <img
+              src="/kakao-login.png"
+              alt="??? ???"
+            />
+          </button>
         </div>
 
         <div className="login-divider">
@@ -144,7 +172,7 @@ function RegisterCattleModal({ onClose, onRegistered }) {
         "사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.",
       );
     } catch (error) {
-      console.error("귀표 OCR 오류:", error);
+      console.error("Login processing error:", error);
       setOcrStatus("error");
       setOcrMessage(
         "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
@@ -199,7 +227,7 @@ function RegisterCattleModal({ onClose, onRegistered }) {
       onRegistered(result);
       onClose();
     } catch (error) {
-      console.error("소 등록 오류:", error);
+      console.error("Login processing error:", error);
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
@@ -364,7 +392,7 @@ function AnomalyDashboard({ demoResult }) {
 
       setAnomalies(result.data ?? []);
     } catch (error) {
-      console.error("이상 개체 조회 오류:", error);
+      console.error("Login processing error:", error);
       setErrorMessage(error.message);
       setAnomalies([]);
     } finally {
@@ -568,25 +596,140 @@ function DashboardPage({ user, setUser }) {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState(() => {
+    const savedUser =
+      localStorage.getItem("loginUser");
+
+    if (!savedUser) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(savedUser);
+    } catch (error) {
+      console.error("Login processing error:", error);
+
+      localStorage.removeItem("loginUser");
+      return null;
+    }
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(
+      window.location.search,
+    );
+
+    const kakaoUserValue =
+      params.get("kakao_user");
+
+    if (!kakaoUserValue) {
+      return;
+    }
+
+    try {
+      const kakaoUser =
+        JSON.parse(kakaoUserValue);
+
+      const normalizedUser = {
+        loginType: "kakao",
+        providerUserId:
+          kakaoUser.providerUserId ?? null,
+        name:
+          kakaoUser.name || "카카오 사용자",
+        email:
+          kakaoUser.email || "이메일 정보 없음",
+        picture:
+          kakaoUser.profileImageUrl || null,
+      };
+
+      localStorage.setItem(
+        "loginUser",
+        JSON.stringify(normalizedUser),
+      );
+
+      setUser(normalizedUser);
+
+      window.history.replaceState(
+        {},
+        document.title,
+        "/dashboard",
+      );
+
+      navigate("/dashboard", {
+        replace: true,
+      });
+    } catch (error) {
+      console.error("Login processing error:", error);
+
+      localStorage.removeItem("loginUser");
+
+      window.history.replaceState(
+        {},
+        document.title,
+        "/login",
+      );
+
+      navigate("/login", {
+        replace: true,
+      });
+    }
+  }, [navigate]);
+
+  useEffect(() => {
+    if (user) {
+      localStorage.setItem(
+        "loginUser",
+        JSON.stringify(user),
+      );
+
+      return;
+    }
+
+    localStorage.removeItem("loginUser");
+  }, [user]);
 
   return (
     <Routes>
       <Route
+        path="/"
+        element={
+          <Navigate
+            to={user ? "/dashboard" : "/login"}
+            replace
+          />
+        }
+      />
+
+      <Route
         path="/login"
-        element={<LoginPage user={user} setUser={setUser} />}
+        element={
+          <LoginPage
+            user={user}
+            setUser={setUser}
+          />
+        }
       />
 
       <Route
         path="/dashboard"
         element={
-          <DashboardPage user={user} setUser={setUser} />
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
         }
       />
 
       <Route
         path="*"
-        element={<Navigate to="/login" replace />}
+        element={
+          <Navigate
+            to={user ? "/dashboard" : "/login"}
+            replace
+          />
+        }
       />
     </Routes>
   );
