@@ -76,7 +76,9 @@ function LoginPage({ user, setUser }) {
             <GoogleLogin
               onSuccess={handleGoogleLogin}
               onError={() => {
-                setErrorMessage("Google ???? ??????.");
+                setErrorMessage(
+                  "Google ???? ??????.",
+                );
               }}
               text="signin"
               locale="ko"
@@ -85,33 +87,37 @@ function LoginPage({ user, setUser }) {
           </div>
 
           <button
-            className="kakao-login-image-button"
+            className="social-provider-button kakao-login-button"
             type="button"
             onClick={() => {
               window.location.assign(
-                "https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login",
+                `${API_BASE_URL}/auth/kakao/login`,
               );
             }}
             aria-label="??? ???"
           >
-            <img
-              src="/kakao-login.png"
-              alt="??? ???"
-            />
+            <span className="social-provider-logo kakao-logo">
+              K
+            </span>
+            <span>???</span>
+          </button>
+
+          <button
+            className="social-provider-button naver-login-button"
+            type="button"
+            onClick={() => {
+              window.location.assign(
+                `${API_BASE_URL}/auth/naver/login`,
+              );
+            }}
+            aria-label="??? ???"
+          >
+            <span className="social-provider-logo naver-logo">
+              N
+            </span>
+            <span>???</span>
           </button>
         </div>
-
-        <div className="login-divider">
-          <span>또는</span>
-        </div>
-
-        <button
-          className="guest-login-button"
-          type="button"
-          onClick={handleGuestLogin}
-        >
-          게스트로 체험하기
-        </button>
 
         {errorMessage && (
           <p className="error-message">{errorMessage}</p>
@@ -617,27 +623,50 @@ function App() {
       window.location.search,
     );
 
-    const kakaoUserValue =
-      params.get("kakao_user");
+    const providerConfigs = [
+      {
+        queryKey: "kakao_user",
+        loginType: "kakao",
+        defaultName: "??? ???",
+      },
+      {
+        queryKey: "naver_user",
+        loginType: "naver",
+        defaultName: "??? ???",
+      },
+    ];
 
-    if (!kakaoUserValue) {
+    const matchedProvider = providerConfigs.find(
+      ({ queryKey }) => params.has(queryKey),
+    );
+
+    if (!matchedProvider) {
+      return;
+    }
+
+    const userValue = params.get(
+      matchedProvider.queryKey,
+    );
+
+    if (!userValue) {
       return;
     }
 
     try {
-      const kakaoUser =
-        JSON.parse(kakaoUserValue);
+      const socialUser = JSON.parse(userValue);
 
       const normalizedUser = {
-        loginType: "kakao",
+        loginType: matchedProvider.loginType,
         providerUserId:
-          kakaoUser.providerUserId ?? null,
+          socialUser.providerUserId ?? null,
         name:
-          kakaoUser.name || "카카오 사용자",
+          socialUser.name ||
+          matchedProvider.defaultName,
         email:
-          kakaoUser.email || "이메일 정보 없음",
+          socialUser.email ||
+          "??? ?? ??",
         picture:
-          kakaoUser.profileImageUrl || null,
+          socialUser.profileImageUrl || null,
       };
 
       localStorage.setItem(
@@ -657,7 +686,10 @@ function App() {
         replace: true,
       });
     } catch (error) {
-      console.error("Login processing error:", error);
+      console.error(
+        "Social login processing error:",
+        error,
+      );
 
       localStorage.removeItem("loginUser");
 
