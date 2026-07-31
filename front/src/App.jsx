@@ -84,16 +84,20 @@ function LoginPage({ user, setUser }) {
             />
                   </div>
 
-        <a
+        <button
             className="kakao-login-image-button"
-            href="https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login"
+            type="button"
+            onClick={() => {
+              window.location.href =
+                "https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login";
+            }}
             aria-label="??? ???"
           >
             <img
               src="/kakao-login.png"
               alt="??? ???"
             />
-          </a>
+          </button>
         </div>
 
         <div className="login-divider">
