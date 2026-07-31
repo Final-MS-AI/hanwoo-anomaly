@@ -33,7 +33,7 @@ button {
 
 .login-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 720px;
   padding: 40px 32px;
   text-align: center;
   background: rgba(255, 255, 255, 0.94);
@@ -179,7 +179,11 @@ h1 {
   display: flex;
   align-items: center;
   gap: 14px;
+  width: 339px;
+  max-width: 100%;
   margin: 22px 0;
+  margin-right: auto;
+  margin-left: auto;
   color: #9a8878;
   font-size: 14px;
 }
@@ -193,7 +197,8 @@ h1 {
 }
 
 .guest-login-button {
-  width: 100%;
+  width: 339px;
+  max-width: 100%;
   padding: 13px 18px;
   color: #654321;
   background: #fffaf3;

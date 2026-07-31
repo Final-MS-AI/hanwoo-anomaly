@@ -1,6 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
 import "./kakao-login.css";
 import {
@@ -18,7 +17,7 @@ function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
 
-  const handleGoogleLogin = (credentialResponse) => {
+  const handleGoogleLogin = async (credentialResponse) => {
     try {
       const credential = credentialResponse?.credential;
 
@@ -27,23 +26,50 @@ function LoginPage({ user, setUser }) {
         return;
       }
 
-      const decoded = jwtDecode(credential);
+      setErrorMessage("");
+
+      const response = await fetch(
+        `${API_BASE_URL}/auth/google`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            credential,
+          }),
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.detail ??
+            "Google 로그인에 실패했습니다.",
+        );
+      }
 
       setUser({
-        loginType: "google",
-        name: decoded.name ?? "이름 없음",
-        email: decoded.email ?? "이메일 없음",
-        picture: decoded.picture ?? null,
+        id: result.id,
+        loginType: result.provider,
+        providerUserId: result.provider_user_id,
+        name: result.name ?? "Google 사용자",
+        email: result.email ?? "이메일 정보 없음",
+        picture: result.profile_image_url ?? null,
       });
 
       setErrorMessage("");
       navigate("/dashboard");
     } catch (error) {
-      console.error("Login processing error:", error);
-      setErrorMessage("로그인 정보를 처리하지 못했습니다.");
+      console.error("Google login error:", error);
+
+      setErrorMessage(
+        error.message ??
+          "Google 로그인 정보를 처리하지 못했습니다.",
+      );
     }
   };
-
   const handleGuestLogin = () => {
     setUser({
       loginType: "guest",
@@ -777,4 +803,7 @@ function App() {
 }
 
 export default App;
+
+
+
 
