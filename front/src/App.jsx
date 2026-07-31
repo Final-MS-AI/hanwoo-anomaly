@@ -72,8 +72,8 @@ function LoginPage({ user, setUser }) {
         </p>
 
         <div className="social-login-buttons">
-          <div className="google-login">
-                    <GoogleLogin
+          <div className="google-login-wrapper">
+            <GoogleLogin
               onSuccess={handleGoogleLogin}
               onError={() => {
                 setErrorMessage("Google ???? ??????.");
@@ -82,14 +82,15 @@ function LoginPage({ user, setUser }) {
               locale="ko"
               size="medium"
             />
-                  </div>
+          </div>
 
-        <button
+          <button
             className="kakao-login-image-button"
             type="button"
             onClick={() => {
-              window.location.href =
-                "https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login";
+              window.location.assign(
+                "https://hanwoo.koreacentral.cloudapp.azure.com/auth/kakao/login",
+              );
             }}
             aria-label="??? ???"
           >
