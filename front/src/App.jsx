@@ -56,14 +56,6 @@ function LoginPage({ user, setUser }) {
     navigate("/dashboard");
   };
 
-  const handleKakaoLogin = () => {
-    setErrorMessage("");
-
-    window.location.assign(
-      `${API_BASE_URL}/auth/kakao/login`,
-    );
-  };
-
   if (user) {
     return <Navigate to="/dashboard" replace />;
   }
@@ -94,7 +86,7 @@ function LoginPage({ user, setUser }) {
 
         <a
             className="kakao-login-image-button"
-            href={`${API_BASE_URL}/auth/kakao/login`}
+            href="http://20.194.30.236:8000/auth/kakao/login"
             aria-label="??? ???"
           >
             <img
