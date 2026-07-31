@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import { jwtDecode } from "jwt-decode";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
@@ -68,7 +68,7 @@ function LoginPage({ user, setUser }) {
         <h1>한우 행동 이상 탐지</h1>
 
         <p className="description">
-          Google 또는 카카오 계정으로 로그인하거나 게스트로 체험해 보세요.
+          Google, 카카오 또는 네이버 계정으로 로그인해 주세요.
         </p>
 
         <div className="social-login-buttons">
@@ -77,29 +77,30 @@ function LoginPage({ user, setUser }) {
               onSuccess={handleGoogleLogin}
               onError={() => {
                 setErrorMessage(
-                  "Google ???? ??????.",
+                  "Google 로그인에 실패했습니다.",
                 );
               }}
               text="signin"
               locale="ko"
               size="medium"
+              width="100"
             />
           </div>
 
           <button
-            className="social-provider-button kakao-login-button"
+            className="kakao-login-image-button"
             type="button"
             onClick={() => {
               window.location.assign(
                 `${API_BASE_URL}/auth/kakao/login`,
               );
             }}
-            aria-label="??? ???"
+            aria-label="카카오 로그인"
           >
-            <span className="social-provider-logo kakao-logo">
-              K
-            </span>
-            <span>???</span>
+            <img
+              src="/kakao-login.png"
+              alt="카카오 로그인"
+            />
           </button>
 
           <button
@@ -110,14 +111,26 @@ function LoginPage({ user, setUser }) {
                 `${API_BASE_URL}/auth/naver/login`,
               );
             }}
-            aria-label="??? ???"
+            aria-label="네이버 로그인"
           >
             <span className="social-provider-logo naver-logo">
               N
             </span>
-            <span>???</span>
+            <span>로그인</span>
           </button>
         </div>
+
+        <div className="login-divider">
+          <span>또는</span>
+        </div>
+
+        <button
+          className="guest-login-button"
+          type="button"
+          onClick={handleGuestLogin}
+        >
+          게스트로 로그인
+        </button>
 
         {errorMessage && (
           <p className="error-message">{errorMessage}</p>
@@ -627,12 +640,12 @@ function App() {
       {
         queryKey: "kakao_user",
         loginType: "kakao",
-        defaultName: "??? ???",
+        defaultName: "카카오 사용자",
       },
       {
         queryKey: "naver_user",
         loginType: "naver",
-        defaultName: "??? ???",
+        defaultName: "네이버 사용자",
       },
     ];
 
@@ -664,7 +677,7 @@ function App() {
           matchedProvider.defaultName,
         email:
           socialUser.email ||
-          "??? ?? ??",
+          "이메일 정보 없음",
         picture:
           socialUser.profileImageUrl || null,
       };
@@ -764,3 +777,4 @@ function App() {
 }
 
 export default App;
+

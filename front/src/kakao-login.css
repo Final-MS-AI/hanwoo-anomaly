@@ -1,106 +1,81 @@
-﻿.social-login-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+.social-login-buttons {
+  display: grid;
+  grid-template-columns: 100px 90px 100px;
   gap: 12px;
+  width: fit-content;
+  max-width: 100%;
+  margin-right: auto;
+  margin-left: auto;
+  margin-top: 20px;
+}
+
+.google-login-wrapper,
+.kakao-login-image-button,
+.social-provider-button {
+  width: 100%;
+  min-width: 0;
+  height: 32px;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .google-login-wrapper {
-  position: relative;
-  z-index: 1;
-  width: fit-content;
-  height: 40px;
-  overflow: hidden;
-  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
+.google-login-wrapper > div,
 .google-login-wrapper iframe {
-  display: block;
-  max-width: 100%;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 32px !important;
 }
 
-.kakao-login-image-button {
-  position: relative;
-  z-index: 20;
+.kakao-login-image-button,
+.social-provider-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 80px;
-  width: 80px;
-  height: 40px;
+  box-sizing: border-box;
   padding: 0;
-  margin: 0;
   border: 0;
-  border-radius: 6px;
-  background: transparent;
   cursor: pointer;
-  overflow: hidden;
-  pointer-events: auto;
+  white-space: nowrap;
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease;
+}
+
+.kakao-login-image-button {
+  background: #fee500;
 }
 
 .kakao-login-image-button img {
   display: block;
-  width: 80px;
-  height: 40px;
-  object-fit: fill;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   pointer-events: none;
 }
 
-/* Google / Kakao / Naver social login layout */
-.social-login-buttons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  width: 100%;
-  margin-top: 18px;
-  flex-wrap: nowrap;
-}
-
-.google-login-wrapper {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  height: 40px;
-  overflow: hidden;
-}
-
-.google-login-wrapper iframe {
-  display: block;
-  max-width: 100%;
-}
-
 .social-provider-button {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  flex: 0 0 auto;
-  min-width: 92px;
-  height: 40px;
-  padding: 0 13px;
-  border-radius: 6px;
+  gap: 6px;
+  padding: 0 10px;
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
-  cursor: pointer;
-  white-space: nowrap;
-  transition:
-    transform 0.15s ease,
-    filter 0.15s ease;
 }
 
-.social-provider-button:hover {
+.social-provider-button:hover,
+.kakao-login-image-button:hover {
   filter: brightness(0.97);
   transform: translateY(-1px);
 }
 
-.social-provider-button:active {
+.social-provider-button:active,
+.kakao-login-image-button:active {
   transform: translateY(0);
 }
 
@@ -108,72 +83,28 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  font-size: 14px;
   font-weight: 900;
-}
-
-.kakao-login-button {
-  border: 1px solid #fee500;
-  background: #fee500;
-  color: #191919;
-}
-
-.kakao-logo {
-  color: #191919;
 }
 
 .naver-login-button {
   border: 1px solid #03c75a;
   background: #03c75a;
-  color: #ffffff;
+  color: #fff;
 }
 
 .naver-logo {
-  color: #ffffff;
+  color: #fff;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 420px) {
   .social-login-buttons {
+    grid-template-columns: 88px 79px 88px;
     gap: 7px;
   }
 
   .social-provider-button {
-    min-width: 78px;
-    padding: 0 9px;
+    gap: 4px;
+    padding: 0 6px;
     font-size: 12px;
-  }
-}
-
-.kakao-login-image-button {
-  position: relative;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-  width: 144px;
-  height: 40px;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  overflow: hidden;
-}
-
-.kakao-login-image-button img {
-  display: block;
-  width: 144px;
-  height: 40px;
-  object-fit: fill;
-  pointer-events: none;
-}
-
-@media (max-width: 640px) {
-  .kakao-login-image-button,
-  .kakao-login-image-button img {
-    width: 112px;
   }
 }
