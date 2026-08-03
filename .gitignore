@@ -7,3 +7,8 @@ front/.env.*.local
 *.before-api
 *.backup
 *.bak
+
+# Backup files
+*.backup
+*.before-*
+*.bak

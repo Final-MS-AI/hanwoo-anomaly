@@ -108,3 +108,17 @@
     font-size: 12px;
   }
 }
+
+.dashboard-page {
+  min-height: 100vh;
+  padding-bottom: 40px;
+  background: #f6f0e7;
+  box-sizing: border-box;
+}
+
+.dashboard-page > .video-selector,
+.dashboard-page > .demo-video-selector {
+  margin-left: auto;
+  margin-right: auto;
+}
+

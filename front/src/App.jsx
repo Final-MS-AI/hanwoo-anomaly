@@ -1,6 +1,7 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
+import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
 import "./kakao-login.css";
 import {
   Navigate,
@@ -622,7 +623,7 @@ function DashboardPage({ user, setUser }) {
         </div>
       </header>
 <DemoVideoSelector />
-<AnomalyDashboard />
+<AbnormalCattleDashboard />
 
       {isRegisterOpen && (
         <RegisterCattleModal
@@ -803,6 +804,7 @@ function App() {
 }
 
 export default App;
+
 
 
 
