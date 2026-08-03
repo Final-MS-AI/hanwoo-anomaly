@@ -16,6 +16,11 @@ const navigationItems = [
     icon: "＋",
     label: "소 등록",
   },
+  {
+    to: "/chat",
+    icon: "✦",
+    label: "AI 상담",
+  },
 ];
 
 function BottomNavigation() {

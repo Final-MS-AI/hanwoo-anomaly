@@ -3,9 +3,9 @@ import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
 import BottomNavigation from "./BottomNavigation.jsx";
 import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
+import RagChatbot from "./RagChatbot.jsx";
 import "./kakao-login.css";
 import "./mobile-header-fix.css";
-import "./app-mobile.css";
 import {
   Navigate,
   Route,
@@ -671,6 +671,8 @@ function DashboardPage({ user, setUser }) {
         />
       )}
 
+      {location.pathname === "/chat" && <RagChatbot />}
+
       <BottomNavigation />
 
     </main>
@@ -843,6 +845,15 @@ function App() {
 
       <Route
         path="/cattle/register"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/chat"
         element={
           <DashboardPage
             user={user}
