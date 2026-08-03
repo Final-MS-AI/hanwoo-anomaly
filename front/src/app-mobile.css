@@ -1,0 +1,318 @@
+/* App/WebView layout overrides. Loaded last to keep the mobile shell predictable. */
+.dashboard-page {
+  padding-bottom: 118px;
+}
+
+.dashboard-header.app-header {
+  position: relative;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1120px, calc(100% - 48px));
+  min-height: 64px;
+  margin: 0 auto;
+}
+
+.dashboard-header.app-header .header-logo-button {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.dashboard-header.app-header .dashboard-cowow-logo {
+  display: block;
+  width: 132px;
+  height: 42px;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.dashboard-priority-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 16px 18px;
+  background: #fff8f5;
+  border: 1px solid #f0d3cc;
+  border-radius: 15px;
+}
+
+.dashboard-priority-status {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+}
+
+.dashboard-priority-status > div {
+  display: grid;
+  gap: 4px;
+}
+
+.dashboard-priority-status strong {
+  color: #35251e;
+  font-size: 15px;
+}
+
+.dashboard-priority-status span:not(.cattle-status-dot) {
+  color: #806e64;
+  font-size: 13px;
+}
+
+.dashboard-details-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  flex: 0 0 auto;
+  color: #fff;
+  background: #68451f;
+  border: 0;
+  border-radius: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dashboard-details-button span {
+  font-size: 18px;
+}
+
+.dashboard-content-grid.is-collapsed {
+  display: none;
+}
+
+.dashboard-content-grid.is-open {
+  margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+  .dashboard-page {
+    padding: 0 0 calc(96px + env(safe-area-inset-bottom));
+  }
+
+  .dashboard-header.app-header {
+    position: sticky !important;
+    top: 0;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 56px !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: calc(6px + env(safe-area-inset-top)) 12px 6px !important;
+    background: rgba(247, 241, 231, 0.94);
+    border-bottom: 1px solid rgba(112, 78, 48, 0.1);
+    backdrop-filter: blur(12px);
+    box-sizing: border-box !important;
+  }
+
+  .dashboard-header.app-header .header-logo-button {
+    position: static !important;
+    display: flex !important;
+    width: auto !important;
+    height: 40px !important;
+    transform: none !important;
+  }
+
+  .dashboard-header.app-header .dashboard-cowow-logo {
+    width: 112px !important;
+    height: 36px !important;
+    transform: none !important;
+  }
+
+  .dashboard-header.app-header .header-actions-right {
+    position: static !important;
+    display: flex !important;
+    width: auto !important;
+    height: auto !important;
+    margin: 0 0 0 auto !important;
+    transform: none !important;
+  }
+
+  .dashboard-header.app-header .profile-menu-wrapper {
+    height: auto !important;
+  }
+
+  .dashboard-header.app-header .profile-menu-button {
+    width: auto !important;
+    min-width: 0 !important;
+    height: 40px !important;
+    min-height: 40px !important;
+    padding: 4px 8px 4px 5px !important;
+    gap: 7px !important;
+  }
+
+  .dashboard-header.app-header .header-guest-profile,
+  .dashboard-header.app-header .header-profile-image {
+    width: 30px !important;
+    min-width: 30px !important;
+    height: 30px !important;
+  }
+
+  .dashboard-header.app-header .header-user-info {
+    display: flex !important;
+    width: auto !important;
+    max-width: 88px !important;
+    height: auto !important;
+  }
+
+  .dashboard-header.app-header .header-user-info strong {
+    overflow: hidden;
+    max-width: 88px;
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dashboard-header.app-header .header-user-info span,
+  .dashboard-header.app-header .profile-menu-arrow {
+    display: none !important;
+  }
+
+  .dashboard-header.app-header .profile-dropdown {
+    top: calc(100% + 8px) !important;
+    right: 0 !important;
+    width: 128px !important;
+  }
+
+  .abnormal-dashboard {
+    width: calc(100% - 24px);
+    margin: 14px auto 24px;
+    padding: 18px;
+  }
+
+  .abnormal-dashboard-header {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+
+  .abnormal-dashboard-header h2 {
+    font-size: 22px;
+  }
+
+  .abnormal-dashboard-header p {
+    margin-top: 6px;
+    font-size: 13px;
+  }
+
+  .dashboard-update-time {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  .dashboard-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 7px;
+    margin-bottom: 14px;
+  }
+
+  .dashboard-summary-card {
+    min-height: 76px;
+    padding: 11px 8px;
+    border-radius: 12px;
+    text-align: center;
+  }
+
+  .dashboard-summary-card span {
+    margin-bottom: 8px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .dashboard-summary-card strong {
+    font-size: 23px;
+  }
+
+  .dashboard-summary-card small {
+    display: none;
+  }
+
+  .dashboard-priority-card {
+    display: grid;
+    gap: 13px;
+    padding: 14px;
+  }
+
+  .dashboard-details-button {
+    width: 100%;
+  }
+
+  .dashboard-content-grid.is-open {
+    margin-top: 14px;
+  }
+
+  .dashboard-panel {
+    padding: 16px;
+  }
+
+  .dashboard-panel-header {
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+
+  .dashboard-filter-buttons {
+    width: 100%;
+  }
+
+  .dashboard-filter-buttons button {
+    min-height: 40px;
+    flex: 1;
+  }
+
+  .abnormal-cattle-item {
+    grid-template-columns: 1fr auto;
+    gap: 6px 10px;
+    padding: 13px;
+  }
+
+  .abnormal-cattle-item time {
+    grid-column: 1 / -1;
+  }
+
+  .bottom-navigation {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
+
+  .bottom-navigation-item {
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 360px) {
+  .dashboard-header.app-header .dashboard-cowow-logo {
+    width: 96px !important;
+  }
+
+  .dashboard-header.app-header .header-user-info {
+    max-width: 70px !important;
+  }
+
+  .dashboard-summary-card {
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .dashboard-summary-card strong {
+    font-size: 20px;
+  }
+
+  .dashboard-update-time {
+    display: none;
+  }
+}

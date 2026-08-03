@@ -1,13 +1,17 @@
 ﻿import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
+import BottomNavigation from "./BottomNavigation.jsx";
 import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
-import "./kakao-login.css";
+import "./kakao-login.css";
+import "./mobile-header-fix.css";
+import "./app-mobile.css";
 import {
   Navigate,
   Route,
   Routes,
   useNavigate,
+  useLocation,
 } from "react-router-dom";
 
 const API_BASE_URL =
@@ -90,13 +94,23 @@ function LoginPage({ user, setUser }) {
   return (
     <main className="page">
       <section className="login-card">
-        <div className="cow-icon">🐂</div>
+        <div className="login-brand">
+          <img
+            className="login-cowow-logo"
+            src="/cowow-logo.png"
+            alt="COWOW"
+          />
 
-        <h1>한우 행동 이상 탐지</h1>
+          <img
+            className="login-bull-image"
+            src="/cowow-bull.png"
+            alt="COWOW 황소 캐릭터"
+          />
+        </div>
 
-        <p className="description">
-          Google, 카카오 또는 네이버 계정으로 로그인해 주세요.
-        </p>
+        
+
+        
 
         <div className="social-login-buttons">
           <div className="google-login-wrapper">
@@ -167,7 +181,11 @@ function LoginPage({ user, setUser }) {
   );
 }
 
-function RegisterCattleModal({ onClose, onRegistered }) {
+function RegisterCattleModal({
+  onClose,
+  onRegistered,
+  embedded = false,
+}) {
   const [earTagImage, setEarTagImage] = useState(null);
   const [muzzleImage, setMuzzleImage] = useState(null);
   const [earTagNumber, setEarTagNumber] = useState("");
@@ -277,19 +295,32 @@ function RegisterCattleModal({ onClose, onRegistered }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <section className="modal-card">
+    <div
+      className={
+        embedded
+          ? "register-page-container"
+          : "modal-backdrop"
+      }
+    >
+      <section
+        className={
+          embedded
+            ? "register-page-card"
+            : "modal-card"
+        }
+      >
         <div className="modal-header">
           <h2>소 등록하기</h2>
-
-          <button
-            className="modal-close-button"
-            type="button"
-            onClick={onClose}
-            aria-label="등록창 닫기"
-          >
-            ×
-          </button>
+          {!embedded && (
+            <button
+              className="modal-close-button"
+              type="button"
+              onClick={onClose}
+              aria-label="등록창 닫기"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <form className="cattle-form" onSubmit={handleSubmit}>
@@ -544,9 +575,8 @@ function AnomalyDashboard({ demoResult }) {
 
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const location = useLocation();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [demoInferenceResult, setDemoInferenceResult] = useState(null);
 
   if (!user) {
     return <Navigate to="/login" replace />;
@@ -563,21 +593,21 @@ function DashboardPage({ user, setUser }) {
 
   return (
     <main className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <p className="dashboard-subtitle dashboard-title">
-            한우 모니터링 시스템
-          </p>
-        </div>
+      <header className="dashboard-header app-header">
+        <button
+          className="header-logo-button"
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          aria-label="대시보드로 이동"
+        >
+          <img
+            className="dashboard-cowow-logo"
+            src="/cowow-logo.png"
+            alt="COWOW"
+          />
+        </button>
 
-                <div className="header-actions header-actions-right">
-          <button
-            className="register-cattle-button"
-            type="button"
-            onClick={() => setIsRegisterOpen(true)}
-          >
-            + 소 등록하기
-          </button>
+        <div className="header-actions header-actions-right">
 
           <div className="profile-menu-wrapper">
             <button
@@ -622,17 +652,27 @@ function DashboardPage({ user, setUser }) {
           </div>
         </div>
       </header>
-<DemoVideoSelector />
-<AbnormalCattleDashboard />
+{location.pathname === "/dashboard" && (
+        <AbnormalCattleDashboard />
+      )}
 
-      {isRegisterOpen && (
+      {location.pathname === "/inference" && (
+        <DemoVideoSelector />
+      )}
+
+      {location.pathname === "/cattle/register" && (
         <RegisterCattleModal
-          onClose={() => setIsRegisterOpen(false)}
+          embedded
+          onClose={() => navigate("/dashboard")}
           onRegistered={() => {
             window.alert("소 등록이 완료되었습니다.");
+            navigate("/dashboard");
           }}
         />
       )}
+
+      <BottomNavigation />
+
     </main>
   );
 }
@@ -790,6 +830,26 @@ function App() {
         }
       />
 
+
+      <Route
+        path="/inference"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+
+      <Route
+        path="/cattle/register"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
       <Route
         path="*"
         element={
@@ -804,6 +864,27 @@ function App() {
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

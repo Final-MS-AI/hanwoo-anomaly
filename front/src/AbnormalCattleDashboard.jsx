@@ -8,6 +8,7 @@ import {
 
 function AbnormalCattleDashboard() {
   const [filter, setFilter] = useState("all");
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
   const filteredCattle = useMemo(() => {
     if (filter === "all") {
@@ -59,7 +60,35 @@ function AbnormalCattleDashboard() {
         </article>
       </div>
 
-      <div className="dashboard-content-grid">
+      <div className="dashboard-priority-card">
+        <div className="dashboard-priority-status">
+          <span className="cattle-status-dot danger" />
+          <div>
+            <strong>지금 확인할 위험 개체</strong>
+            <span>
+              위험 {cattleSummary.danger}마리 · 주의 {cattleSummary.warning}마리
+            </span>
+          </div>
+        </div>
+
+        <button
+          className="dashboard-details-button"
+          type="button"
+          aria-expanded={isDetailsOpen}
+          aria-controls="dashboard-details"
+          onClick={() => setIsDetailsOpen((previous) => !previous)}
+        >
+          {isDetailsOpen ? "상세 현황 접기" : "상세 현황 보기"}
+          <span aria-hidden="true">{isDetailsOpen ? "▲" : "›"}</span>
+        </button>
+      </div>
+
+      <div
+        id="dashboard-details"
+        className={`dashboard-content-grid ${
+          isDetailsOpen ? "is-open" : "is-collapsed"
+        }`}
+      >
         <div className="dashboard-panel">
           <div className="dashboard-panel-header">
             <div>

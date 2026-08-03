@@ -12,3 +12,8 @@ front/.env.*.local
 *.backup
 *.before-*
 *.bak
+
+# Backup files
+*.backup
+*.before-*
+*.bak
