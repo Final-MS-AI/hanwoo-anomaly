@@ -1,17 +1,17 @@
-import { useEffect, useRef, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 
 const DEMO_VIDEOS = [
   {
     id: "normal",
     title: "일반 축사 영상",
     description: "여러 개체의 일상 행동을 추적하는 시연 영상입니다.",
-    videoUrl: "",
+    videoUrl: "/cow_normal.mp4",
   },
   {
     id: "abnormal",
     title: "이상 개체 포함 영상",
     description: "여러 소 중 이상 징후가 있는 개체를 탐지합니다.",
-    videoUrl: "",
+    videoUrl: "/cow_normal.mp4",
   },
 ];
 
@@ -59,106 +59,161 @@ function DemoVideoSelector({ onInferenceComplete }) {
     setIsSelectorOpen(false);
   };
 
-  const handleStartInference = () => {
+  const handleStartInference = async () => {
     if (!selectedVideo || isRunning) {
       return;
     }
 
-    setProgress(0);
-    setDetectedCattle([]);
-    setJobStatus("uploading");
+    try {
+      console.log("영상 분석 시작");
+      console.log(
+        "API 주소:",
+        import.meta.env.VITE_API_BASE_URL,
+      );
 
-    let currentProgress = 0;
+      setProgress(0);
+      setDetectedCattle([]);
+      setJobStatus("uploading");
 
-    timerRef.current = setInterval(() => {
-      currentProgress += 1;
+      const sourceResponse = await fetch(
+        selectedVideo.videoUrl,
+      );
 
-      if (currentProgress >= 12 && currentProgress < 35) {
-        setJobStatus("detecting");
+      if (!sourceResponse.ok) {
+        throw new Error(
+          "선택한 원본 영상을 불러오지 못했습니다.",
+        );
       }
 
-      if (currentProgress >= 35 && currentProgress < 65) {
-        setJobStatus("tracking");
+      const videoBlob = await sourceResponse.blob();
+      const formData = new FormData();
+
+      formData.append(
+        "video",
+        videoBlob,
+        `${selectedVideo.id}.mp4`,
+      );
+
+      const createResponse = await fetch(
+        `https://hanwoo.koreacentral.cloudapp.azure.com/inference/jobs`,
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      const createResult =
+        await createResponse.json();
+
+      if (!createResponse.ok) {
+        throw new Error(
+          createResult.detail ||
+            "영상 업로드에 실패했습니다.",
+        );
       }
 
-      if (currentProgress >= 65 && currentProgress < 100) {
-        setJobStatus("analyzing");
-      }
+      const jobId = createResult.job_id;
 
-      if (currentProgress >= 100) {
-        clearInterval(timerRef.current);
-        timerRef.current = null;
+      console.log("추론 작업 생성:", jobId);
 
-        const result =
-          selectedVideo.id === "abnormal"
-            ? [
-                {
-                  cattleId: "COW-01",
-                  trackId: 1,
-                  behavior: "정상 활동",
-                  status: "normal",
-                  confidence: 0.95,
-                },
-                {
-                  cattleId: "COW-02",
-                  trackId: 2,
-                  behavior: "장시간 누움",
-                  status: "warning",
-                  confidence: 0.91,
-                },
-                {
-                  cattleId: "COW-03",
-                  trackId: 3,
-                  behavior: "이동량 감소",
-                  status: "warning",
-                  confidence: 0.87,
-                },
-              ]
-            : [
-                {
-                  cattleId: "COW-01",
-                  trackId: 1,
-                  behavior: "정상 활동",
-                  status: "normal",
-                  confidence: 0.96,
-                },
-                {
-                  cattleId: "COW-02",
-                  trackId: 2,
-                  behavior: "정상 활동",
-                  status: "normal",
-                  confidence: 0.94,
-                },
-                {
-                  cattleId: "COW-03",
-                  trackId: 3,
-                  behavior: "반추 중",
-                  status: "normal",
-                  confidence: 0.92,
-                },
-              ];
+      timerRef.current = setInterval(async () => {
+        try {
+          const statusResponse = await fetch(
+            `https://hanwoo.koreacentral.cloudapp.azure.com/inference/jobs/${jobId}`,
+          );
 
-        setProgress(100);
-        setJobStatus("completed");
-        setDetectedCattle(result);
+          const statusResult =
+            await statusResponse.json();
 
-        if (onInferenceComplete) {
-          onInferenceComplete({
-            videoId: selectedVideo.id,
-            cattle: result,
-            anomalies: result.filter(
-              (item) => item.status === "warning",
-            ),
-          });
+          console.log("추론 상태:", statusResult);
+
+          if (!statusResponse.ok) {
+            throw new Error(
+              statusResult.detail ||
+                "추론 상태 조회에 실패했습니다.",
+            );
+          }
+
+          setProgress(statusResult.progress ?? 0);
+
+          const statusMap = {
+            queued: "uploading",
+            processing: "detecting",
+            detecting: "detecting",
+            tracking: "tracking",
+            analyzing: "analyzing",
+            completed: "completed",
+          };
+
+          setJobStatus(
+            statusMap[statusResult.status] ??
+              "detecting",
+          );
+
+          if (statusResult.status === "completed") {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+
+            const resultVideoUrl =
+              statusResult.result_url;
+
+            console.log("결과 영상 URL:", resultVideoUrl);
+
+            setSelectedVideo((previous) => ({
+              ...previous,
+              videoUrl: resultVideoUrl,
+              resultVideoUrl,
+              inferenceSummary:
+                statusResult.summary ?? null,
+            }));
+
+            setDetectedCattle([]);
+
+            if (onInferenceComplete) {
+              onInferenceComplete({
+                videoId: selectedVideo.id,
+                jobId,
+                resultVideoUrl,
+                summary: statusResult.summary ?? null,
+                cattle: [],
+                anomalies: [],
+              });
+            }
+          }
+
+          if (statusResult.status === "failed") {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+
+            throw new Error(
+              statusResult.error ||
+                "영상 추론에 실패했습니다.",
+            );
+          }
+        } catch (pollError) {
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+
+          console.error(
+            "추론 상태 조회 오류:",
+            pollError,
+          );
+
+          setJobStatus("idle");
+          setProgress(0);
+          window.alert(pollError.message);
         }
+      }, 2000);
+    } catch (error) {
+      console.error("추론 시작 오류:", error);
 
-        return;
-      }
-
-      setProgress(currentProgress);
-    }, 180);
+      setJobStatus("idle");
+      setProgress(0);
+      window.alert(error.message);
+    }
   };
-
   const handleReset = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -233,9 +288,25 @@ function DemoVideoSelector({ onInferenceComplete }) {
           <div className="inference-video-panel">
             {selectedVideo.videoUrl ? (
               <video
+                key={selectedVideo.videoUrl}
                 className="inference-video"
                 src={selectedVideo.videoUrl}
                 controls
+                preload="metadata"
+                playsInline
+                onLoadedMetadata={() => {
+                  console.log(
+                    "결과 영상 로드 완료:",
+                    selectedVideo.videoUrl,
+                  );
+                }}
+                onError={(event) => {
+                  console.error(
+                    "영상 로드 실패:",
+                    selectedVideo.videoUrl,
+                    event.currentTarget.error,
+                  );
+                }}
               />
             ) : (
               <div className="video-placeholder">
@@ -385,3 +456,10 @@ function DemoVideoSelector({ onInferenceComplete }) {
 }
 
 export default DemoVideoSelector;
+
+
+
+
+
+
+

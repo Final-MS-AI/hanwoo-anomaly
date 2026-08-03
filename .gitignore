@@ -1,0 +1,9 @@
+﻿
+# Frontend local environment
+front/.env.local
+front/.env.*.local
+# Local demonstration videos
+# Backup files
+*.before-api
+*.backup
+*.bak
