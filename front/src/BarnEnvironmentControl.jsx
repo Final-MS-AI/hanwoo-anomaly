@@ -69,6 +69,7 @@ function BarnEnvironmentControl() {
   const [mode, setMode] = useState("auto");
   const [fanLevel, setFanLevel] = useState(2);
   const [isSpraying, setIsSpraying] = useState(false);
+  const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const sprayTimerRef = useRef(null);
 
@@ -245,69 +246,90 @@ function BarnEnvironmentControl() {
         </div>
       </div>
 
-      <div className="control-mode-row">
-        <div>
-          <strong>제어 모드</strong>
-          <span>{mode === "auto" ? "센서값에 따라 자동 운전" : "관리자가 직접 운전"}</span>
+      <button
+        className="environment-controls-toggle"
+        type="button"
+        aria-expanded={isControlsOpen}
+        aria-controls="environment-device-controls"
+        onClick={() => setIsControlsOpen((previous) => !previous)}
+      >
+        <span>
+          <strong>팬·살수 장비 제어</strong>
+          <small>
+            {mode === "auto" ? "자동" : "수동"} · 팬 {fanLevel === 0 ? "정지" : `${fanLevel}단`} · {isSpraying ? "살수 중" : "살수 대기"}
+          </small>
+        </span>
+        <b>{isControlsOpen ? "접기 ▲" : "제어 열기 ›"}</b>
+      </button>
+
+      <div
+        id="environment-device-controls"
+        className={`environment-device-controls ${isControlsOpen ? "is-open" : "is-collapsed"}`}
+      >
+        <div className="control-mode-row">
+          <div>
+            <strong>제어 모드</strong>
+            <span>{mode === "auto" ? "센서값에 따라 자동 운전" : "관리자가 직접 운전"}</span>
+          </div>
+          <div className="control-mode-buttons" role="group" aria-label="제어 모드">
+            <button className={mode === "auto" ? "active" : ""} type="button" onClick={() => setMode("auto")}>자동</button>
+            <button className={mode === "manual" ? "active" : ""} type="button" onClick={() => setMode("manual")}>수동</button>
+          </div>
         </div>
-        <div className="control-mode-buttons" role="group" aria-label="제어 모드">
-          <button className={mode === "auto" ? "active" : ""} type="button" onClick={() => setMode("auto")}>자동</button>
-          <button className={mode === "manual" ? "active" : ""} type="button" onClick={() => setMode("manual")}>수동</button>
+
+        <div className="actuator-grid">
+          <article className="actuator-card">
+            <div className="actuator-header">
+              <div>
+                <span className="actuator-label">환기 장치</span>
+                <h3>환기팬</h3>
+              </div>
+              <span className={`device-status ${fanLevel > 0 ? "on" : "off"}`}>
+                {fanLevel > 0 ? `운전 ${fanLevel}단계` : "정지"}
+              </span>
+            </div>
+            <div className="fan-level-buttons" role="group" aria-label="환기팬 단계">
+              {[0, 1, 2, 3].map((level) => (
+                <button
+                  className={fanLevel === level ? "active" : ""}
+                  type="button"
+                  key={level}
+                  disabled={mode === "auto"}
+                  onClick={() => changeFanLevel(level)}
+                >
+                  {level === 0 ? "정지" : `${level}단`}
+                </button>
+              ))}
+            </div>
+            {mode === "auto" && <p className="auto-control-hint">수동 조작은 수동 모드에서 사용할 수 있습니다.</p>}
+          </article>
+
+          <article className="actuator-card">
+            <div className="actuator-header">
+              <div>
+                <span className="actuator-label">냉각 장치</span>
+                <h3>물 뿌리기</h3>
+              </div>
+              <span className={`device-status ${isSpraying ? "on" : "off"}`}>
+                {isSpraying ? "살수 중" : "대기"}
+              </span>
+            </div>
+            <button
+              className={`sprayer-button ${isSpraying ? "stop" : ""}`}
+              type="button"
+              disabled={mode === "auto"}
+              onClick={toggleSprayer}
+            >
+              {isSpraying ? "살수 정지" : "30초 살수 시작"}
+            </button>
+            {mode === "auto" && <p className="auto-control-hint">고온 조건에서 자동으로 살수합니다.</p>}
+          </article>
         </div>
-      </div>
 
-      <div className="actuator-grid">
-        <article className="actuator-card">
-          <div className="actuator-header">
-            <div>
-              <span className="actuator-label">환기 장치</span>
-              <h3>환기팬</h3>
-            </div>
-            <span className={`device-status ${fanLevel > 0 ? "on" : "off"}`}>
-              {fanLevel > 0 ? `운전 ${fanLevel}단계` : "정지"}
-            </span>
-          </div>
-          <div className="fan-level-buttons" role="group" aria-label="환기팬 단계">
-            {[0, 1, 2, 3].map((level) => (
-              <button
-                className={fanLevel === level ? "active" : ""}
-                type="button"
-                key={level}
-                disabled={mode === "auto"}
-                onClick={() => changeFanLevel(level)}
-              >
-                {level === 0 ? "정지" : `${level}단`}
-              </button>
-            ))}
-          </div>
-          {mode === "auto" && <p className="auto-control-hint">수동 조작은 수동 모드에서 사용할 수 있습니다.</p>}
-        </article>
-
-        <article className="actuator-card">
-          <div className="actuator-header">
-            <div>
-              <span className="actuator-label">냉각 장치</span>
-              <h3>물 뿌리기</h3>
-            </div>
-            <span className={`device-status ${isSpraying ? "on" : "off"}`}>
-              {isSpraying ? "살수 중" : "대기"}
-            </span>
-          </div>
-          <button
-            className={`sprayer-button ${isSpraying ? "stop" : ""}`}
-            type="button"
-            disabled={mode === "auto"}
-            onClick={toggleSprayer}
-          >
-            {isSpraying ? "살수 정지" : "30초 살수 시작"}
-          </button>
-          {mode === "auto" && <p className="auto-control-hint">고온 조건에서 자동으로 살수합니다.</p>}
-        </article>
-      </div>
-
-      <div className="control-feedback" role="status">
-        <span>최근 제어</span>
-        <strong>{controlMessage}</strong>
+        <div className="control-feedback" role="status">
+          <span>최근 제어</span>
+          <strong>{controlMessage}</strong>
+        </div>
       </div>
     </section>
   );
