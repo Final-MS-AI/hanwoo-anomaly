@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const CONTROL_API_URL = import.meta.env.VITE_CONTROL_API_URL ?? "";
+const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 
 const initialSensors = {
   temperature: 27.8,
@@ -55,6 +57,14 @@ function getSensorLevel(value, sensor) {
 }
 
 function BarnEnvironmentControl() {
+  const navigate = useNavigate();
+  const [device] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(DEVICE_STORAGE_KEY)) ?? null;
+    } catch {
+      return null;
+    }
+  });
   const [sensors, setSensors] = useState(initialSensors);
   const [mode, setMode] = useState("auto");
   const [fanLevel, setFanLevel] = useState(2);
@@ -104,13 +114,17 @@ function BarnEnvironmentControl() {
     setControlMessage(`센서 기준으로 환기팬 ${recommendedLevel}단계를 자동 유지합니다.`);
   }, [mode, sensors.ammonia, sensors.temperature]);
 
-  const sendControlCommand = async (device, value) => {
+  const sendControlCommand = async (actuator, value) => {
     if (!CONTROL_API_URL) return;
 
     const response = await fetch(`${CONTROL_API_URL}/actuators`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ device, value }),
+      body: JSON.stringify({
+        deviceId: device?.deviceId,
+        actuator,
+        value,
+      }),
     });
 
     if (!response.ok) throw new Error("장비 제어 명령 전송에 실패했습니다.");
@@ -164,9 +178,37 @@ function BarnEnvironmentControl() {
           <h2>축사 환경 제어</h2>
           <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
         </div>
-        <span className="sensor-connection-badge">
-          {CONTROL_API_URL ? "장비 연결" : "데모 데이터"}
-        </span>
+        <button
+          className={`sensor-connection-badge ${device ? "connected" : ""}`}
+          type="button"
+          onClick={() => navigate("/devices/setup")}
+        >
+          {device ? "● 원격 연결" : CONTROL_API_URL ? "장비 등록" : "데모 데이터"}
+        </button>
+      </div>
+
+      <div className={`remote-connection-card ${device ? "connected" : "unregistered"}`}>
+        <div className="remote-connection-main">
+          <span className="remote-connection-icon">{device ? "⌁" : "+"}</span>
+          <div>
+            <strong>{device ? device.deviceName ?? device.deviceId : "ESP32 게이트웨이를 등록해 주세요"}</strong>
+            <p>
+              {device
+                ? `ESP32 → ${device.networkName || "핫스팟"} → MQTT 서버 → 현재 기기`
+                : "최초 한 번 등록하면 모바일 데이터에서도 원격 제어할 수 있습니다."}
+            </p>
+          </div>
+        </div>
+        <div className="remote-connection-meta">
+          {device ? (
+            <>
+              <span><i /> 온라인</span>
+              <small>마지막 통신 방금 전</small>
+            </>
+          ) : (
+            <button type="button" onClick={() => navigate("/devices/setup")}>장비 등록하기</button>
+          )}
+        </div>
       </div>
 
       <div className="sensor-grid">

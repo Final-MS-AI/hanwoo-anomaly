@@ -5,6 +5,7 @@ import BottomNavigation from "./BottomNavigation.jsx";
 import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
 import RagChatbot from "./RagChatbot.jsx";
 import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
+import DeviceSetupPage from "./DeviceSetupPage.jsx";
 import "./kakao-login.css";
 import "./mobile-header-fix.css";
 import {
@@ -579,6 +580,11 @@ function DashboardPage({ user, setUser }) {
   const location = useLocation();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    setIsProfileMenuOpen(false);
+  }, [location.pathname]);
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
@@ -676,6 +682,10 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/control" && (
         <BarnEnvironmentControl />
+      )}
+
+      {location.pathname === "/devices/setup" && (
+        <DeviceSetupPage />
       )}
 
       <BottomNavigation />
@@ -868,6 +878,15 @@ function App() {
       />
       <Route
         path="/control"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/devices/setup"
         element={
           <DashboardPage
             user={user}
