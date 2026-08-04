@@ -7,6 +7,7 @@ import RagChatbot from "./RagChatbot.jsx";
 import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
 import DeviceSetupPage from "./DeviceSetupPage.jsx";
 import {
+  createGuestSession,
   exchangeGoogleCredential,
   getCurrentUser,
   GOOGLE_CLIENT_ID,
@@ -117,16 +118,22 @@ function LoginPage({ user, setUser }) {
       setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
     }
   };
-  const handleGuestLogin = () => {
-    setUser({
-      loginType: "guest",
-      name: "게스트 사용자",
-      email: "guest@cow-monitoring.local",
-      picture: null,
-    });
+  const handleGuestLogin = async () => {
+    try {
+      setErrorMessage("");
+      setIsLoggingIn(true);
 
-    setErrorMessage("");
-    navigate("/dashboard");
+      const guestUser = await createGuestSession();
+      setUser(guestUser);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Guest login error:", error);
+      setErrorMessage(
+        error.message ?? "게스트 로그인에 실패했습니다.",
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   if (user) {
@@ -229,8 +236,9 @@ function LoginPage({ user, setUser }) {
           className="guest-login-button"
           type="button"
           onClick={handleGuestLogin}
+          disabled={isLoggingIn}
         >
-          게스트로 로그인
+          {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
         </button>
 
         {errorMessage && (

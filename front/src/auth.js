@@ -64,6 +64,15 @@ export async function exchangeGoogleCredential(credential) {
   return normalizeUser(await parseResponse(response));
 }
 
+export async function createGuestSession() {
+  const response = await fetch(`${API_BASE_URL}/auth/guest`, {
+    method: "POST",
+    credentials: "include",
+  });
+
+  return normalizeUser(await parseResponse(response));
+}
+
 export async function getCurrentUser({ signal } = {}) {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     method: "GET",
@@ -98,4 +107,3 @@ export function startSocialLogin(provider) {
   loginUrl.searchParams.set("return_url", returnUrl);
   window.location.assign(loginUrl.toString());
 }
-

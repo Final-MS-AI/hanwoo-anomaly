@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-const CONTROL_API_URL = import.meta.env.VITE_CONTROL_API_URL ?? "";
+const CONTROL_API_URL =
+  import.meta.env.VITE_CONTROL_API_URL ??
+  import.meta.env.VITE_API_BASE_URL ??
+  "";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 
 const initialSensors = {
@@ -120,6 +123,7 @@ function BarnEnvironmentControl() {
 
     const response = await fetch(`${CONTROL_API_URL}/actuators`, {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         deviceId: device?.deviceId,
