@@ -1,57 +1,142 @@
-import { useCallback, useEffect, useState } from "react";
+﻿import { useCallback, useEffect, useState } from "react";
 import { GoogleLogin, googleLogout } from "@react-oauth/google";
-import { jwtDecode } from "jwt-decode";
 import DemoVideoSelector from "./DemoVideoSelector.jsx";
+import BottomNavigation from "./BottomNavigation.jsx";
+import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
+import RagChatbot from "./RagChatbot.jsx";
+import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
+import DeviceSetupPage from "./DeviceSetupPage.jsx";
+import {
+  createGuestSession,
+  exchangeGoogleCredential,
+  getCurrentUser,
+  GOOGLE_CLIENT_ID,
+  hasAndroidAuthBridge,
+  logoutSession,
+  startSocialLogin,
+} from "./auth.js";
+import "./kakao-login.css";
+
+import "./mobile-header-fix.css";
 import {
   Navigate,
   Route,
   Routes,
   useNavigate,
+  useLocation,
 } from "react-router-dom";
 
-const API_BASE_URL = "http://20.194.30.236:8000";
+
 const MUZZLE_API = "https://hanwoo.koreacentral.cloudapp.azure.com";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  "https://hanwoo.koreacentral.cloudapp.azure.com";
 
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const isAndroidApp = hasAndroidAuthBridge();
 
-  const handleGoogleLogin = (credentialResponse) => {
+  const completeGoogleLogin = useCallback(async (credential) => {
     try {
-      const credential = credentialResponse?.credential;
-
       if (!credential) {
         setErrorMessage("Google 인증 정보를 받지 못했습니다.");
         return;
       }
 
-      const decoded = jwtDecode(credential);
+      setErrorMessage("");
+      setIsLoggingIn(true);
 
-      setUser({
-        loginType: "google",
-        name: decoded.name ?? "이름 없음",
-        email: decoded.email ?? "이메일 없음",
-        picture: decoded.picture ?? null,
-      });
+      const authenticatedUser =
+        await exchangeGoogleCredential(credential);
+
+      setUser(authenticatedUser);
 
       setErrorMessage("");
       navigate("/dashboard");
     } catch (error) {
-      console.error("Google 로그인 처리 오류:", error);
-      setErrorMessage("로그인 정보를 처리하지 못했습니다.");
+      console.error("Google login error:", error);
+
+      setErrorMessage(
+        error.message ??
+          "Google 로그인 정보를 처리하지 못했습니다.",
+      );
+    } finally {
+      setIsLoggingIn(false);
     }
+  }, [navigate, setUser]);
+
+  const handleGoogleLogin = (credentialResponse) => {
+    completeGoogleLogin(credentialResponse?.credential);
   };
 
-  const handleGuestLogin = () => {
-    setUser({
-      loginType: "guest",
-      name: "게스트 사용자",
-      email: "guest@cow-monitoring.local",
-      picture: null,
-    });
+  useEffect(() => {
+    if (!isAndroidApp) {
+      return undefined;
+    }
 
+    const handleNativeSuccess = (event) => {
+      completeGoogleLogin(event.detail?.idToken);
+    };
+
+    const handleNativeError = (event) => {
+      setIsLoggingIn(false);
+      setErrorMessage(
+        event.detail?.message ??
+          "Google 로그인에 실패했습니다.",
+      );
+    };
+
+    window.addEventListener(
+      "cowow:google-login",
+      handleNativeSuccess,
+    );
+    window.addEventListener(
+      "cowow:google-login-error",
+      handleNativeError,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "cowow:google-login",
+        handleNativeSuccess,
+      );
+      window.removeEventListener(
+        "cowow:google-login-error",
+        handleNativeError,
+      );
+    };
+  }, [completeGoogleLogin, isAndroidApp]);
+
+  const handleNativeGoogleLogin = () => {
     setErrorMessage("");
-    navigate("/dashboard");
+    setIsLoggingIn(true);
+
+    try {
+      window.COWOW_ANDROID.googleLogin();
+    } catch (error) {
+      console.error("Native Google login error:", error);
+      setIsLoggingIn(false);
+      setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
+    }
+  };
+  const handleGuestLogin = async () => {
+    try {
+      setErrorMessage("");
+      setIsLoggingIn(true);
+
+      const guestUser = await createGuestSession();
+      setUser(guestUser);
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Guest login error:", error);
+      setErrorMessage(
+        error.message ?? "게스트 로그인에 실패했습니다.",
+      );
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   if (user) {
@@ -61,21 +146,89 @@ function LoginPage({ user, setUser }) {
   return (
     <main className="page">
       <section className="login-card">
-        <div className="cow-icon">🐂</div>
-
-        <h1>한우 행동 이상 탐지</h1>
-
-        <p className="description">
-          Google 계정으로 로그인하거나 게스트로 체험해 보세요.
-        </p>
-
-        <div className="google-login">
-          <GoogleLogin
-            onSuccess={handleGoogleLogin}
-            onError={() => {
-              setErrorMessage("Google 로그인에 실패했습니다.");
-            }}
+        <div className="login-brand">
+          <img
+            className="login-cowow-logo"
+            src="/cowow-logo.png"
+            alt="COWOW"
           />
+
+          <img
+            className="login-bull-image"
+            src="/cowow-bull.png"
+            alt="COWOW 황소 캐릭터"
+          />
+        </div>
+
+        
+
+        
+
+        <div className="social-login-buttons">
+          <div className="google-login-wrapper">
+            {isAndroidApp ? (
+              <button
+                className="native-google-login-button"
+                type="button"
+                onClick={handleNativeGoogleLogin}
+                disabled={isLoggingIn}
+              >
+                <span className="native-google-logo">G</span>
+                <span>{isLoggingIn ? "로그인 중" : "로그인"}</span>
+              </button>
+            ) : GOOGLE_CLIENT_ID ? (
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => {
+                  setErrorMessage(
+                    "Google 로그인에 실패했습니다.",
+                  );
+                }}
+                text="signin"
+                locale="ko"
+                size="medium"
+                width="100"
+              />
+            ) : (
+              <button
+                className="native-google-login-button"
+                type="button"
+                disabled
+                title="VITE_GOOGLE_CLIENT_ID 설정이 필요합니다."
+              >
+                <span className="native-google-logo">G</span>
+                <span>로그인</span>
+              </button>
+            )}
+          </div>
+
+          <button
+            className="kakao-login-image-button"
+            type="button"
+            onClick={() => {
+              startSocialLogin("kakao");
+            }}
+            aria-label="카카오 로그인"
+          >
+            <img
+              src="/kakao-login.png"
+              alt="카카오 로그인"
+            />
+          </button>
+
+          <button
+            className="social-provider-button naver-login-button"
+            type="button"
+            onClick={() => {
+              startSocialLogin("naver");
+            }}
+            aria-label="네이버 로그인"
+          >
+            <span className="social-provider-logo naver-logo">
+              N
+            </span>
+            <span>로그인</span>
+          </button>
         </div>
 
         <div className="login-divider">
@@ -86,8 +239,9 @@ function LoginPage({ user, setUser }) {
           className="guest-login-button"
           type="button"
           onClick={handleGuestLogin}
+          disabled={isLoggingIn}
         >
-          게스트로 체험하기
+          {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
         </button>
 
         {errorMessage && (
@@ -98,7 +252,11 @@ function LoginPage({ user, setUser }) {
   );
 }
 
-function RegisterCattleModal({ onClose, onRegistered }) {
+function RegisterCattleModal({
+  onClose,
+  onRegistered,
+  embedded = false,
+}) {
   const [earTagImage, setEarTagImage] = useState(null);
   const [muzzleImage, setMuzzleImage] = useState(null);
   const [earTagNumber, setEarTagNumber] = useState("");
@@ -145,7 +303,7 @@ function RegisterCattleModal({ onClose, onRegistered }) {
         "사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.",
       );
     } catch (error) {
-      console.error("귀표 OCR 오류:", error);
+      console.error("Login processing error:", error);
       setOcrStatus("error");
       setOcrMessage(
         "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
@@ -187,7 +345,6 @@ function RegisterCattleModal({ onClose, onRegistered }) {
       formData.append("muzzle_image", muzzleImage);
 
       // ── 비문 임베딩 등록 (개체 식별 파트) ──
-      // 팀원 백엔드(/cattle) 성공 여부와 무관하게 먼저 실행한다
       let muzzleOk = false;
       const muzzleInput = event.target.elements.muzzle_files;
       const muzzleFiles = muzzleInput ? Array.from(muzzleInput.files) : [];
@@ -229,18 +386,13 @@ function RegisterCattleModal({ onClose, onRegistered }) {
       const result = await response.json();
 
       if (!response.ok) {
-        if (muzzleOk) {
-          throw new Error(
-            "비문 등록은 완료됐으나 개체 정보 저장에 실패했습니다. (백엔드 /cattle 미구현)",
-          );
-        }
         throw new Error(result.detail ?? "소 등록에 실패했습니다.");
       }
 
       onRegistered(result);
       onClose();
     } catch (error) {
-      console.error("소 등록 오류:", error);
+      console.error("Login processing error:", error);
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
@@ -248,19 +400,32 @@ function RegisterCattleModal({ onClose, onRegistered }) {
   };
 
   return (
-    <div className="modal-backdrop">
-      <section className="modal-card">
+    <div
+      className={
+        embedded
+          ? "register-page-container"
+          : "modal-backdrop"
+      }
+    >
+      <section
+        className={
+          embedded
+            ? "register-page-card"
+            : "modal-card"
+        }
+      >
         <div className="modal-header">
           <h2>소 등록하기</h2>
-
-          <button
-            className="modal-close-button"
-            type="button"
-            onClick={onClose}
-            aria-label="등록창 닫기"
-          >
-            ×
-          </button>
+          {!embedded && (
+            <button
+              className="modal-close-button"
+              type="button"
+              onClick={onClose}
+              aria-label="등록창 닫기"
+            >
+              ×
+            </button>
+          )}
         </div>
 
         <form className="cattle-form" onSubmit={handleSubmit}>
@@ -348,8 +513,8 @@ function RegisterCattleModal({ onClose, onRegistered }) {
 
             <input
               type="file"
-              name="muzzle_files"
               accept="image/jpeg,image/png,image/webp"
+              name="muzzle_files"
               multiple
               onChange={(event) => {
                 setMuzzleImage(event.target.files?.[0] ?? null);
@@ -407,7 +572,7 @@ function AnomalyDashboard({ demoResult }) {
 
       setAnomalies(result.data ?? []);
     } catch (error) {
-      console.error("이상 개체 조회 오류:", error);
+      console.error("Login processing error:", error);
       setErrorMessage(error.message);
       setAnomalies([]);
     } finally {
@@ -517,40 +682,61 @@ function AnomalyDashboard({ demoResult }) {
 
 function DashboardPage({ user, setUser }) {
   const navigate = useNavigate();
-  const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+  const location = useLocation();
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
-  const [demoInferenceResult, setDemoInferenceResult] = useState(null);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+    setIsProfileMenuOpen(false);
+  }, [location.pathname]);
 
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (user.loginType === "google") {
-      googleLogout();
+      try {
+        if (
+          typeof window.COWOW_ANDROID?.googleLogout ===
+          "function"
+        ) {
+          window.COWOW_ANDROID.googleLogout();
+        } else {
+          googleLogout();
+        }
+      } catch (error) {
+        console.error("Google logout error:", error);
+      }
     }
 
-    setUser(null);
-    navigate("/login");
+    try {
+      await logoutSession();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      navigate("/login", { replace: true });
+    }
   };
 
   return (
     <main className="dashboard-page">
-      <header className="dashboard-header">
-        <div>
-          <p className="dashboard-subtitle dashboard-title">
-            한우 모니터링 시스템
-          </p>
-        </div>
+      <header className="dashboard-header app-header">
+        <button
+          className="header-logo-button"
+          type="button"
+          onClick={() => navigate("/dashboard")}
+          aria-label="대시보드로 이동"
+        >
+          <img
+            className="dashboard-cowow-logo"
+            src="/cowow-logo.png"
+            alt="COWOW"
+          />
+        </button>
 
-                <div className="header-actions header-actions-right">
-          <button
-            className="register-cattle-button"
-            type="button"
-            onClick={() => setIsRegisterOpen(true)}
-          >
-            + 소 등록하기
-          </button>
+        <div className="header-actions header-actions-right">
 
           <div className="profile-menu-wrapper">
             <button
@@ -595,44 +781,194 @@ function DashboardPage({ user, setUser }) {
           </div>
         </div>
       </header>
-<DemoVideoSelector />
-<AnomalyDashboard />
+{location.pathname === "/dashboard" && (
+        <AbnormalCattleDashboard />
+      )}
 
-      {isRegisterOpen && (
+      {location.pathname === "/inference" && (
+        <DemoVideoSelector />
+      )}
+
+      {location.pathname === "/cattle/register" && (
         <RegisterCattleModal
-          onClose={() => setIsRegisterOpen(false)}
+          embedded
+          onClose={() => navigate("/dashboard")}
           onRegistered={() => {
             window.alert("소 등록이 완료되었습니다.");
+            navigate("/dashboard");
           }}
         />
       )}
+
+      {location.pathname === "/chat" && <RagChatbot />}
+
+      {location.pathname === "/control" && (
+        <BarnEnvironmentControl />
+      )}
+
+      {location.pathname === "/devices/setup" && (
+        <DeviceSetupPage />
+      )}
+
+      <BottomNavigation />
+
     </main>
   );
 }
 
 function App() {
-  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const [user, setUser] = useState(undefined);
+
+  useEffect(() => {
+    localStorage.removeItem("loginUser");
+
+    const controller = new AbortController();
+
+    getCurrentUser({ signal: controller.signal })
+      .then((authenticatedUser) => {
+        setUser(authenticatedUser);
+
+        const params = new URLSearchParams(window.location.search);
+        if (authenticatedUser && params.get("auth") === "success") {
+          window.history.replaceState({}, document.title, "/dashboard");
+          navigate("/dashboard", { replace: true });
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error("Session restore error:", error);
+          setUser(null);
+        }
+      });
+
+    return () => controller.abort();
+  }, [navigate]);
+
+  if (user === undefined) {
+    return (
+      <main className="page auth-loading-page">
+        <p>로그인 상태를 확인하고 있습니다.</p>
+      </main>
+    );
+  }
 
   return (
     <Routes>
       <Route
+        path="/"
+        element={
+          <Navigate
+            to={user ? "/dashboard" : "/login"}
+            replace
+          />
+        }
+      />
+
+      <Route
         path="/login"
-        element={<LoginPage user={user} setUser={setUser} />}
+        element={
+          <LoginPage
+            user={user}
+            setUser={setUser}
+          />
+        }
       />
 
       <Route
         path="/dashboard"
         element={
-          <DashboardPage user={user} setUser={setUser} />
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+
+
+      <Route
+        path="/inference"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
         }
       />
 
       <Route
+        path="/cattle/register"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/chat"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/control"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/devices/setup"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
         path="*"
-        element={<Navigate to="/login" replace />}
+        element={
+          <Navigate
+            to={user ? "/dashboard" : "/login"}
+            replace
+          />
+        }
       />
     </Routes>
   );
 }
 
 export default App;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

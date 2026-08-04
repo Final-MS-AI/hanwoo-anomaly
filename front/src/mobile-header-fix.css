@@ -1,0 +1,118 @@
+﻿@media (max-width: 640px) {
+  .dashboard-header.app-header {
+    position: relative !important;
+    display: block !important;
+    width: 100% !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    max-height: 44px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  .dashboard-header.app-header .header-logo-button {
+    position: absolute !important;
+    left: 12px !important;
+    top: 50% !important;
+    display: block !important;
+    width: 118px !important;
+    height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    transform: translateY(-50%) !important;
+  }
+
+  .dashboard-header.app-header .dashboard-cowow-logo {
+    display: block !important;
+    width: 118px !important;
+    height: 32px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    object-fit: contain !important;
+    object-position: left center !important;
+    transform: none !important;
+  }
+
+  .dashboard-header.app-header .header-actions-right {
+    position: absolute !important;
+    right: 12px !important;
+    top: 50% !important;
+    display: block !important;
+    width: auto !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    transform: translateY(-50%) !important;
+  }
+
+  .dashboard-header.app-header .profile-menu-wrapper {
+    position: relative !important;
+    display: block !important;
+    width: auto !important;
+    height: 30px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .dashboard-header.app-header .profile-menu-button {
+    display: flex !important;
+    align-items: center !important;
+    width: 108px !important;
+    min-width: 108px !important;
+    height: 30px !important;
+    min-height: 30px !important;
+    margin: 0 !important;
+    padding: 3px 6px !important;
+    gap: 5px !important;
+    box-sizing: border-box !important;
+    transform: none !important;
+  }
+
+  .dashboard-header.app-header .header-guest-profile,
+  .dashboard-header.app-header .header-profile-image {
+    width: 23px !important;
+    min-width: 23px !important;
+    height: 23px !important;
+    margin: 0 !important;
+  }
+
+  .dashboard-header.app-header .header-user-info {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    width: 68px !important;
+    max-width: 68px !important;
+    height: 23px !important;
+    margin: 0 !important;
+  }
+
+  .dashboard-header.app-header .header-user-info strong {
+    font-size: 8px !important;
+    line-height: 11px !important;
+  }
+
+  .dashboard-header.app-header .header-user-info span {
+    overflow: hidden !important;
+    max-width: 68px !important;
+    font-size: 5px !important;
+    line-height: 8px !important;
+    white-space: nowrap !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .dashboard-header.app-header .profile-menu-arrow {
+    display: none !important;
+  }
+
+  .dashboard-header.app-header .profile-dropdown {
+    position: absolute !important;
+    top: 36px !important;
+    right: 0 !important;
+    left: auto !important;
+    width: 108px !important;
+    z-index: 3000 !important;
+  }
+}
