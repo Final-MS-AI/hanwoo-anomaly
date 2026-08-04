@@ -6,6 +6,14 @@ import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
 import RagChatbot from "./RagChatbot.jsx";
 import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
 import DeviceSetupPage from "./DeviceSetupPage.jsx";
+import {
+  exchangeGoogleCredential,
+  getCurrentUser,
+  GOOGLE_CLIENT_ID,
+  hasAndroidAuthBridge,
+  logoutSession,
+  startSocialLogin,
+} from "./auth.js";
 import "./kakao-login.css";
 import "./mobile-header-fix.css";
 import {
@@ -23,48 +31,23 @@ const API_BASE_URL =
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
   const [errorMessage, setErrorMessage] = useState("");
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const isAndroidApp = hasAndroidAuthBridge();
 
-  const handleGoogleLogin = async (credentialResponse) => {
+  const completeGoogleLogin = useCallback(async (credential) => {
     try {
-      const credential = credentialResponse?.credential;
-
       if (!credential) {
         setErrorMessage("Google 인증 정보를 받지 못했습니다.");
         return;
       }
 
       setErrorMessage("");
+      setIsLoggingIn(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/auth/google`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            credential,
-          }),
-        },
-      );
+      const authenticatedUser =
+        await exchangeGoogleCredential(credential);
 
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.detail ??
-            "Google 로그인에 실패했습니다.",
-        );
-      }
-
-      setUser({
-        id: result.id,
-        loginType: result.provider,
-        providerUserId: result.provider_user_id,
-        name: result.name ?? "Google 사용자",
-        email: result.email ?? "이메일 정보 없음",
-        picture: result.profile_image_url ?? null,
-      });
+      setUser(authenticatedUser);
 
       setErrorMessage("");
       navigate("/dashboard");
@@ -75,6 +58,63 @@ function LoginPage({ user, setUser }) {
         error.message ??
           "Google 로그인 정보를 처리하지 못했습니다.",
       );
+    } finally {
+      setIsLoggingIn(false);
+    }
+  }, [navigate, setUser]);
+
+  const handleGoogleLogin = (credentialResponse) => {
+    completeGoogleLogin(credentialResponse?.credential);
+  };
+
+  useEffect(() => {
+    if (!isAndroidApp) {
+      return undefined;
+    }
+
+    const handleNativeSuccess = (event) => {
+      completeGoogleLogin(event.detail?.idToken);
+    };
+
+    const handleNativeError = (event) => {
+      setIsLoggingIn(false);
+      setErrorMessage(
+        event.detail?.message ??
+          "Google 로그인에 실패했습니다.",
+      );
+    };
+
+    window.addEventListener(
+      "cowow:google-login",
+      handleNativeSuccess,
+    );
+    window.addEventListener(
+      "cowow:google-login-error",
+      handleNativeError,
+    );
+
+    return () => {
+      window.removeEventListener(
+        "cowow:google-login",
+        handleNativeSuccess,
+      );
+      window.removeEventListener(
+        "cowow:google-login-error",
+        handleNativeError,
+      );
+    };
+  }, [completeGoogleLogin, isAndroidApp]);
+
+  const handleNativeGoogleLogin = () => {
+    setErrorMessage("");
+    setIsLoggingIn(true);
+
+    try {
+      window.COWOW_ANDROID.googleLogin();
+    } catch (error) {
+      console.error("Native Google login error:", error);
+      setIsLoggingIn(false);
+      setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
     }
   };
   const handleGuestLogin = () => {
@@ -116,27 +156,47 @@ function LoginPage({ user, setUser }) {
 
         <div className="social-login-buttons">
           <div className="google-login-wrapper">
-            <GoogleLogin
-              onSuccess={handleGoogleLogin}
-              onError={() => {
-                setErrorMessage(
-                  "Google 로그인에 실패했습니다.",
-                );
-              }}
-              text="signin"
-              locale="ko"
-              size="medium"
-              width="100"
-            />
+            {isAndroidApp ? (
+              <button
+                className="native-google-login-button"
+                type="button"
+                onClick={handleNativeGoogleLogin}
+                disabled={isLoggingIn}
+              >
+                <span className="native-google-logo">G</span>
+                <span>{isLoggingIn ? "로그인 중" : "로그인"}</span>
+              </button>
+            ) : GOOGLE_CLIENT_ID ? (
+              <GoogleLogin
+                onSuccess={handleGoogleLogin}
+                onError={() => {
+                  setErrorMessage(
+                    "Google 로그인에 실패했습니다.",
+                  );
+                }}
+                text="signin"
+                locale="ko"
+                size="medium"
+                width="100"
+              />
+            ) : (
+              <button
+                className="native-google-login-button"
+                type="button"
+                disabled
+                title="VITE_GOOGLE_CLIENT_ID 설정이 필요합니다."
+              >
+                <span className="native-google-logo">G</span>
+                <span>로그인</span>
+              </button>
+            )}
           </div>
 
           <button
             className="kakao-login-image-button"
             type="button"
             onClick={() => {
-              window.location.assign(
-                `${API_BASE_URL}/auth/kakao/login`,
-              );
+              startSocialLogin("kakao");
             }}
             aria-label="카카오 로그인"
           >
@@ -150,9 +210,7 @@ function LoginPage({ user, setUser }) {
             className="social-provider-button naver-login-button"
             type="button"
             onClick={() => {
-              window.location.assign(
-                `${API_BASE_URL}/auth/naver/login`,
-              );
+              startSocialLogin("naver");
             }}
             aria-label="네이버 로그인"
           >
@@ -589,13 +647,30 @@ function DashboardPage({ user, setUser }) {
     return <Navigate to="/login" replace />;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (user.loginType === "google") {
-      googleLogout();
+      try {
+        if (
+          typeof window.COWOW_ANDROID?.googleLogout ===
+          "function"
+        ) {
+          window.COWOW_ANDROID.googleLogout();
+        } else {
+          googleLogout();
+        }
+      } catch (error) {
+        console.error("Google logout error:", error);
+      }
     }
 
-    setUser(null);
-    navigate("/login");
+    try {
+      await logoutSession();
+    } catch (error) {
+      console.error("Logout error:", error);
+    } finally {
+      setUser(null);
+      navigate("/login", { replace: true });
+    }
   };
 
   return (
@@ -696,124 +771,40 @@ function DashboardPage({ user, setUser }) {
 
 function App() {
   const navigate = useNavigate();
-
-  const [user, setUser] = useState(() => {
-    const savedUser =
-      localStorage.getItem("loginUser");
-
-    if (!savedUser) {
-      return null;
-    }
-
-    try {
-      return JSON.parse(savedUser);
-    } catch (error) {
-      console.error("Login processing error:", error);
-
-      localStorage.removeItem("loginUser");
-      return null;
-    }
-  });
+  const [user, setUser] = useState(undefined);
 
   useEffect(() => {
-    const params = new URLSearchParams(
-      window.location.search,
-    );
+    localStorage.removeItem("loginUser");
 
-    const providerConfigs = [
-      {
-        queryKey: "kakao_user",
-        loginType: "kakao",
-        defaultName: "카카오 사용자",
-      },
-      {
-        queryKey: "naver_user",
-        loginType: "naver",
-        defaultName: "네이버 사용자",
-      },
-    ];
+    const controller = new AbortController();
 
-    const matchedProvider = providerConfigs.find(
-      ({ queryKey }) => params.has(queryKey),
-    );
+    getCurrentUser({ signal: controller.signal })
+      .then((authenticatedUser) => {
+        setUser(authenticatedUser);
 
-    if (!matchedProvider) {
-      return;
-    }
-
-    const userValue = params.get(
-      matchedProvider.queryKey,
-    );
-
-    if (!userValue) {
-      return;
-    }
-
-    try {
-      const socialUser = JSON.parse(userValue);
-
-      const normalizedUser = {
-        loginType: matchedProvider.loginType,
-        providerUserId:
-          socialUser.providerUserId ?? null,
-        name:
-          socialUser.name ||
-          matchedProvider.defaultName,
-        email:
-          socialUser.email ||
-          "이메일 정보 없음",
-        picture:
-          socialUser.profileImageUrl || null,
-      };
-
-      localStorage.setItem(
-        "loginUser",
-        JSON.stringify(normalizedUser),
-      );
-
-      setUser(normalizedUser);
-
-      window.history.replaceState(
-        {},
-        document.title,
-        "/dashboard",
-      );
-
-      navigate("/dashboard", {
-        replace: true,
+        const params = new URLSearchParams(window.location.search);
+        if (authenticatedUser && params.get("auth") === "success") {
+          window.history.replaceState({}, document.title, "/dashboard");
+          navigate("/dashboard", { replace: true });
+        }
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error("Session restore error:", error);
+          setUser(null);
+        }
       });
-    } catch (error) {
-      console.error(
-        "Social login processing error:",
-        error,
-      );
 
-      localStorage.removeItem("loginUser");
-
-      window.history.replaceState(
-        {},
-        document.title,
-        "/login",
-      );
-
-      navigate("/login", {
-        replace: true,
-      });
-    }
+    return () => controller.abort();
   }, [navigate]);
 
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem(
-        "loginUser",
-        JSON.stringify(user),
-      );
-
-      return;
-    }
-
-    localStorage.removeItem("loginUser");
-  }, [user]);
+  if (user === undefined) {
+    return (
+      <main className="page auth-loading-page">
+        <p>로그인 상태를 확인하고 있습니다.</p>
+      </main>
+    );
+  }
 
   return (
     <Routes>

@@ -211,6 +211,13 @@ h1 {
   background: #f4e7d6;
 }
 
+.auth-loading-page {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+  color: #654321;
+}
+
 .guest-profile {
   width: 72px;
   height: 72px;
