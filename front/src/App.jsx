@@ -15,7 +15,8 @@ import {
   logoutSession,
   startSocialLogin,
 } from "./auth.js";
-import "./kakao-login.css";
+import "./kakao-login.css";
+
 import "./mobile-header-fix.css";
 import {
   Navigate,
@@ -25,6 +26,8 @@ import {
   useLocation,
 } from "react-router-dom";
 
+
+const MUZZLE_API = "https://hanwoo.koreacentral.cloudapp.azure.com";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://hanwoo.koreacentral.cloudapp.azure.com";
@@ -341,6 +344,40 @@ function RegisterCattleModal({
       formData.append("ear_tag_image", earTagImage);
       formData.append("muzzle_image", muzzleImage);
 
+      // ── 비문 임베딩 등록 (개체 식별 파트) ──
+      let muzzleOk = false;
+      const muzzleInput = event.target.elements.muzzle_files;
+      const muzzleFiles = muzzleInput ? Array.from(muzzleInput.files) : [];
+      const nationalId = normalizedEarTagNumber
+        .replace(/\D/g, "")
+        .slice(-12)
+        .padStart(12, "0");
+
+      if (muzzleFiles.length > 0) {
+        try {
+          const muzzleForm = new FormData();
+          muzzleForm.append("national_id", nationalId);
+          muzzleForm.append("barn_id", "");
+          muzzleFiles.forEach((f) => muzzleForm.append("files", f));
+
+          const muzzleRes = await fetch(`${MUZZLE_API}/muzzle/enroll`, {
+            method: "POST",
+            body: muzzleForm,
+          });
+
+          if (muzzleRes.ok) {
+            muzzleOk = true;
+            console.log("[비문] 등록 완료:", await muzzleRes.json());
+          } else {
+            console.error("[비문] 등록 실패", muzzleRes.status, await muzzleRes.text());
+          }
+        } catch (err) {
+          console.error("[비문] 등록 오류:", err);
+        }
+      } else {
+        console.warn("[비문] 사진이 선택되지 않아 건너뜀");
+      }
+
       const response = await fetch(`${API_BASE_URL}/cattle`, {
         method: "POST",
         body: formData,
@@ -471,12 +508,14 @@ function RegisterCattleModal({
             비문 사진
 
             <span className="upload-description">
-              코 무늬가 정면으로 선명하게 보이는 사진을 등록해 주세요.
+              코가 화면에 가득 차도록 30cm 거리에서 정면 촬영해 주세요. 얼굴이나 전신이 나오면 인식되지 않습니다. 각도를 바꿔 3장 이상 선택해 주세요.
             </span>
 
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
+              name="muzzle_files"
+              multiple
               onChange={(event) => {
                 setMuzzleImage(event.target.files?.[0] ?? null);
               }}
