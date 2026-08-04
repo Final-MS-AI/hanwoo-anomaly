@@ -4,6 +4,7 @@ import DemoVideoSelector from "./DemoVideoSelector.jsx";
 import BottomNavigation from "./BottomNavigation.jsx";
 import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
 import RagChatbot from "./RagChatbot.jsx";
+import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
 import "./kakao-login.css";
 import "./mobile-header-fix.css";
 import {
@@ -673,6 +674,10 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/chat" && <RagChatbot />}
 
+      {location.pathname === "/control" && (
+        <BarnEnvironmentControl />
+      )}
+
       <BottomNavigation />
 
     </main>
@@ -854,6 +859,15 @@ function App() {
       />
       <Route
         path="/chat"
+        element={
+          <DashboardPage
+            user={user}
+            setUser={setUser}
+          />
+        }
+      />
+      <Route
+        path="/control"
         element={
           <DashboardPage
             user={user}

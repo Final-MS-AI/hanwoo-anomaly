@@ -4,9 +4,284 @@
 }
 
 .bottom-navigation {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  width: min(620px, calc(100% - 32px));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  width: min(720px, calc(100% - 32px));
 }
+
+.environment-control-page {
+  width: min(1000px, calc(100% - 48px));
+  margin: 28px auto 24px;
+  padding: 28px;
+  background: #fff;
+  border: 1px solid #ebe5db;
+  border-radius: 22px;
+  box-shadow: 0 14px 40px rgba(85, 62, 35, 0.08);
+  box-sizing: border-box;
+}
+
+.environment-control-header,
+.sensor-card-top,
+.actuator-header,
+.control-mode-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.environment-control-header h2 {
+  margin: 6px 0 5px;
+}
+
+.environment-control-header p {
+  margin: 0;
+  color: #7a6d61;
+  font-size: 13px;
+}
+
+.environment-live {
+  color: #367247;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.environment-live i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  background: #42a35c;
+  border-radius: 50%;
+  box-shadow: 0 0 0 4px rgba(66, 163, 92, 0.12);
+}
+
+.sensor-connection-badge {
+  padding: 8px 11px;
+  color: #6c5946;
+  background: #f5efe7;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sensor-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.sensor-card {
+  padding: 17px;
+  background: #f8faf8;
+  border: 1px solid #e3e9e4;
+  border-radius: 16px;
+}
+
+.sensor-card.warning {
+  background: #fff9ec;
+  border-color: #eddaa9;
+}
+
+.sensor-card.danger {
+  background: #fff1ef;
+  border-color: #efc5bf;
+}
+
+.sensor-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 6px;
+  color: #356946;
+  background: #e6f2e9;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 900;
+  box-sizing: border-box;
+}
+
+.sensor-state {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.sensor-state.normal { color: #347048; background: #e3f2e7; }
+.sensor-state.warning { color: #9b6a0d; background: #fff0c8; }
+.sensor-state.danger { color: #af3e31; background: #ffddd8; }
+
+.sensor-name {
+  display: block;
+  margin: 14px 0 7px;
+  color: #766b61;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sensor-card strong {
+  color: #2d241d;
+  font-size: 28px;
+}
+
+.sensor-card strong small {
+  margin-left: 4px;
+  color: #897d72;
+  font-size: 11px;
+}
+
+.environment-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 13px 15px;
+  border-radius: 13px;
+}
+
+.environment-notice.normal { background: #edf7ef; }
+.environment-notice.warning { background: #fff4df; }
+
+.environment-notice > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  color: #fff;
+  background: #3f8b53;
+  border-radius: 50%;
+  font-weight: 900;
+}
+
+.environment-notice.warning > span { background: #c98417; }
+.environment-notice strong { font-size: 13px; }
+.environment-notice p { margin: 3px 0 0; color: #776b60; font-size: 12px; }
+
+.control-mode-row {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: #f7f4ef;
+  border-radius: 14px;
+}
+
+.control-mode-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.control-mode-row span { color: #7c7065; font-size: 12px; }
+
+.control-mode-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  background: #e9e2d9;
+  border-radius: 10px;
+}
+
+.control-mode-buttons button {
+  min-width: 64px;
+  min-height: 36px;
+  color: #76695d;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.control-mode-buttons button.active {
+  color: #fff;
+  background: #326f43;
+}
+
+.actuator-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.actuator-card {
+  padding: 18px;
+  border: 1px solid #e8e1d8;
+  border-radius: 16px;
+}
+
+.actuator-label { color: #8a7b6c; font-size: 11px; font-weight: 700; }
+.actuator-card h3 { margin: 4px 0 0; }
+
+.device-status {
+  padding: 6px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.device-status.on { color: #2f7243; background: #e1f2e6; }
+.device-status.off { color: #776c62; background: #eeeae5; }
+
+.fan-level-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 7px;
+  margin-top: 18px;
+}
+
+.fan-level-buttons button,
+.sprayer-button {
+  min-height: 42px;
+  color: #66584b;
+  background: #f7f3ee;
+  border: 1px solid #ddd3c8;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.fan-level-buttons button.active {
+  color: #fff;
+  background: #326f43;
+  border-color: #326f43;
+}
+
+.fan-level-buttons button:disabled,
+.sprayer-button:disabled { cursor: default; opacity: 0.6; }
+
+.sprayer-button {
+  width: 100%;
+  margin-top: 18px;
+  color: #fff;
+  background: #397a93;
+  border-color: #397a93;
+}
+
+.sprayer-button.stop { background: #b54b3d; border-color: #b54b3d; }
+
+.auto-control-hint {
+  margin: 9px 0 0;
+  color: #8b7d70;
+  font-size: 11px;
+}
+
+.control-feedback {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 12px 15px;
+  color: #625548;
+  background: #f5f1eb;
+  border-radius: 12px;
+  font-size: 12px;
+}
+
+.control-feedback span { color: #8c7e71; }
 
 .dashboard-header.app-header {
   position: relative;
@@ -524,7 +799,7 @@
 
   .bottom-navigation {
     bottom: max(8px, env(safe-area-inset-bottom));
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
   }
 
   .bottom-navigation-item {
@@ -693,6 +968,44 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .environment-control-page {
+    width: calc(100% - 24px);
+    margin: 14px auto 20px;
+    padding: 16px;
+    border-radius: 16px;
+  }
+
+  .environment-control-header h2 { font-size: 21px; }
+  .environment-control-header p { display: none; }
+
+  .sensor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .sensor-card { padding: 12px; border-radius: 13px; }
+  .sensor-name { margin-top: 10px; }
+  .sensor-card strong { font-size: 23px; }
+
+  .control-mode-row {
+    padding: 13px;
+  }
+
+  .actuator-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .actuator-card { padding: 14px; }
+  .fan-level-buttons { margin-top: 13px; }
+
+  .control-feedback {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
   }
 }
 

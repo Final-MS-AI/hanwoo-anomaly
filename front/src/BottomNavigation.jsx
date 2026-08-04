@@ -21,6 +21,11 @@ const navigationItems = [
     icon: "✦",
     label: "AI 상담",
   },
+  {
+    to: "/control",
+    icon: "⌁",
+    label: "환경 제어",
+  },
 ];
 
 function BottomNavigation() {
