@@ -8,10 +8,10 @@ const CONTROL_API_URL =
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 
 const initialSensors = {
-  temperature: 27.8,
-  humidity: 68,
-  ammonia: 18.4,
-  carbonDioxide: 820,
+  temperature: null,
+  humidity: null,
+  ammonia: null,
+  carbonDioxide: null,
 };
 
 const sensorDefinitions = [
@@ -54,6 +54,7 @@ const sensorDefinitions = [
 ];
 
 function getSensorLevel(value, sensor) {
+  if (!Number.isFinite(value)) return "unavailable";
   if (value >= sensor.danger) return "danger";
   if (value >= sensor.warning) return "warning";
   return "normal";
@@ -88,7 +89,10 @@ function BarnEnvironmentControl() {
     [sensors],
   );
 
-  const warnings = sensorCards.filter((sensor) => sensor.level !== "normal");
+  const warnings = sensorCards.filter(
+    (sensor) =>
+      sensor.level === "warning" || sensor.level === "danger",
+  );
   const lastSeenLabel = lastSeenAt
     ? new Date(lastSeenAt).toLocaleTimeString("ko-KR", {
         hour: "2-digit",
@@ -272,13 +276,23 @@ function BarnEnvironmentControl() {
             <div className="sensor-card-top">
               <span className="sensor-icon">{sensor.icon}</span>
               <span className={`sensor-state ${sensor.level}`}>
-                {sensor.level === "normal" ? "정상" : sensor.level === "warning" ? "주의" : "위험"}
+                {sensor.level === "unavailable"
+                  ? "미연결"
+                  : sensor.level === "normal"
+                    ? "정상"
+                    : sensor.level === "warning"
+                      ? "주의"
+                      : "위험"}
               </span>
             </div>
             <span className="sensor-name">{sensor.label}</span>
             <strong>
-              {sensor.value.toFixed(sensor.precision)}
-              <small>{sensor.unit}</small>
+              {Number.isFinite(sensor.value)
+                ? sensor.value.toFixed(sensor.precision)
+                : "--"}
+              {Number.isFinite(sensor.value) && (
+                <small>{sensor.unit}</small>
+              )}
             </strong>
           </article>
         ))}
