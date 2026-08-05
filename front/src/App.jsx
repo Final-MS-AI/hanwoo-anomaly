@@ -303,7 +303,7 @@ function RegisterCattleModal({
         "사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.",
       );
     } catch (error) {
-      console.error("Login processing error:", error);
+      console.error("Ear tag OCR error:", error);
       setOcrStatus("error");
       setOcrMessage(
         "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
@@ -392,7 +392,7 @@ function RegisterCattleModal({
       onRegistered(result);
       onClose();
     } catch (error) {
-      console.error("Login processing error:", error);
+      console.error("Cattle registration error:", error);
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
@@ -572,7 +572,7 @@ function AnomalyDashboard({ demoResult }) {
 
       setAnomalies(result.data ?? []);
     } catch (error) {
-      console.error("Login processing error:", error);
+      console.error("Active anomaly fetch error:", error);
       setErrorMessage(error.message);
       setAnomalies([]);
     } finally {
