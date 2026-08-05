@@ -76,6 +76,7 @@ function BarnEnvironmentControl() {
   const [fanLevel, setFanLevel] = useState(2);
   const [isSpraying, setIsSpraying] = useState(false);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const sprayTimerRef = useRef(null);
 
@@ -257,6 +258,42 @@ function BarnEnvironmentControl() {
     }
   };
 
+  const disconnectDevice = async () => {
+    if (!device || isDisconnecting) return;
+
+    const shouldDisconnect = window.confirm(
+      "장비 연결을 해제할까요? 다시 사용하려면 장비 등록이 필요합니다.",
+    );
+    if (!shouldDisconnect) return;
+
+    setIsDisconnecting(true);
+
+    try {
+      const response = await fetch(`${CONTROL_API_URL}/devices/connection`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deviceId: device.deviceId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.detail ?? "장비 연결 해제에 실패했습니다.");
+      }
+
+      localStorage.removeItem(DEVICE_STORAGE_KEY);
+      setDevice(null);
+      setSensors(initialSensors);
+      setIsDeviceOnline(false);
+      setLastSeenAt(null);
+      navigate("/devices/setup", { replace: true });
+    } catch (error) {
+      setControlMessage(error.message);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   return (
     <section className="environment-control-page">
       <div className="environment-control-header">
@@ -297,6 +334,14 @@ function BarnEnvironmentControl() {
             <>
               <span><i /> {isDeviceOnline ? "온라인" : "오프라인"}</span>
               <small>마지막 통신 {lastSeenLabel}</small>
+              <button
+                className="device-disconnect-button"
+                type="button"
+                disabled={isDisconnecting}
+                onClick={disconnectDevice}
+              >
+                {isDisconnecting ? "해제 중..." : "연결 해제"}
+              </button>
             </>
           ) : (
             <button type="button" onClick={() => navigate("/devices/setup")}>장비 등록하기</button>
