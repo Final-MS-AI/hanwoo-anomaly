@@ -7,10 +7,16 @@ const API_BASE_URL =
   "";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const SHOULD_USE_DEVICE_API = import.meta.env.PROD || Boolean(API_BASE_URL);
+const DEVICE_NUMBER_PATTERN = /^COWOW-(000[1-9]|0010)$/;
+const DEVICE_NUMBERS = Array.from(
+  { length: 10 },
+  (_, index) => `COWOW-${String(index + 1).padStart(4, "0")}`,
+);
 
 function DeviceSetupPage({ user }) {
   const navigate = useNavigate();
   const isGuest = user?.loginType === "guest";
+  const [deviceNumber, setDeviceNumber] = useState(isGuest ? "guest" : "");
   const [claimCode, setClaimCode] = useState(isGuest ? "guest" : "");
   const [barnName, setBarnName] = useState("1번 축사");
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -18,7 +24,23 @@ function DeviceSetupPage({ user }) {
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
 
+  const normalizedDeviceNumber = isGuest
+    ? "guest"
+    : deviceNumber.trim().toUpperCase();
+
+  const validateDeviceNumber = () => {
+    if (isGuest || DEVICE_NUMBER_PATTERN.test(normalizedDeviceNumber)) {
+      return true;
+    }
+
+    setMessageType("error");
+    setMessage("장비 번호는 COWOW-0001부터 COWOW-0010까지 입력할 수 있습니다.");
+    return false;
+  };
+
   const sendClaimCode = async () => {
+    if (!validateDeviceNumber()) return;
+
     setIsSendingCode(true);
     setMessage("");
 
@@ -28,6 +50,8 @@ function DeviceSetupPage({ user }) {
         {
           method: "POST",
           credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId: normalizedDeviceNumber }),
         },
       );
       const data = await response.json();
@@ -54,6 +78,8 @@ function DeviceSetupPage({ user }) {
   const registerDevice = async (event) => {
     event.preventDefault();
 
+    if (!validateDeviceNumber()) return;
+
     if (!claimCode.trim()) {
       setMessageType("error");
       setMessage("일회용 등록 코드를 입력해 주세요.");
@@ -64,6 +90,7 @@ function DeviceSetupPage({ user }) {
     setMessage("");
 
     const payload = {
+      deviceId: normalizedDeviceNumber,
       claimCode: claimCode.trim(),
       barnName: barnName.trim(),
     };
@@ -71,8 +98,9 @@ function DeviceSetupPage({ user }) {
     try {
       let registeredDevice = {
         ...payload,
-        deviceId: "ESP32-DEMO-01",
-        deviceName: "ESP32 ESP32-DEMO-01",
+        deviceName: isGuest
+          ? "게스트 데모 장비"
+          : `ESP32 ${normalizedDeviceNumber}`,
       };
 
       if (SHOULD_USE_DEVICE_API) {
@@ -115,7 +143,7 @@ function DeviceSetupPage({ user }) {
       <div className="device-setup-header">
         <span>최초 1회 설정</span>
         <h2>축사 장비 연결</h2>
-        <p>로그인 계정으로 받은 일회용 코드 하나만 입력하면 장비가 연결됩니다.</p>
+        <p>장비 번호를 확인하고 이메일로 받은 일회용 코드를 입력해 연결합니다.</p>
       </div>
 
       <div className="device-network-flow" aria-label="원격 연결 흐름">
@@ -131,22 +159,41 @@ function DeviceSetupPage({ user }) {
       <ol className="device-setup-steps">
         <li>
           <span>1</span>
-          <div><strong>ESP32 전원과 핫스팟 확인</strong><p>장비가 서버에 온라인으로 연결된 상태여야 합니다.</p></div>
+          <div><strong>장비 번호 확인</strong><p>장비 본체 또는 포장지에 적힌 COWOW 번호를 확인합니다.</p></div>
         </li>
         <li>
           <span>2</span>
           <div>
-            <strong>{isGuest ? "게스트 데모 코드 확인" : "로그인 이메일로 코드 받기"}</strong>
-            <p>{isGuest ? "게스트는 데모 장비만 임시 연결할 수 있습니다." : "인증된 이메일로 10분 동안 유효한 코드를 받습니다."}</p>
+            <strong>{isGuest ? "게스트 데모 정보 확인" : "로그인 이메일로 코드 받기"}</strong>
+            <p>{isGuest ? "게스트는 데모 장비만 임시 연결할 수 있습니다." : "선택한 장비의 일회용 등록 코드를 이메일로 받습니다."}</p>
           </div>
         </li>
         <li>
           <span>3</span>
-          <div><strong>등록 코드 입력</strong><p>장비 ID나 QR 없이 코드만으로 연결합니다.</p></div>
+          <div><strong>장비 연결</strong><p>등록 코드와 설치 축사를 확인한 후 제어를 시작합니다.</p></div>
         </li>
       </ol>
 
       <form className="device-claim-form" onSubmit={registerDevice}>
+        <label>
+          <span>장비 번호</span>
+          <input
+            value={deviceNumber}
+            readOnly={isGuest}
+            list={isGuest ? undefined : "cowow-device-numbers"}
+            placeholder="예: COWOW-0001"
+            autoCapitalize="characters"
+            onChange={(event) => setDeviceNumber(event.target.value.toUpperCase())}
+          />
+          {!isGuest && (
+            <datalist id="cowow-device-numbers">
+              {DEVICE_NUMBERS.map((number) => (
+                <option key={number} value={number} />
+              ))}
+            </datalist>
+          )}
+        </label>
+
         <div className="device-account-card">
           <div>
             <span>코드를 받을 계정</span>
@@ -156,7 +203,7 @@ function DeviceSetupPage({ user }) {
             <button
               type="button"
               className="device-send-code-button"
-              disabled={isSendingCode || !user?.email}
+              disabled={isSendingCode || !user?.email || !deviceNumber.trim()}
               onClick={sendClaimCode}
             >
               {isSendingCode ? "발송 중..." : "등록 코드 받기"}
@@ -190,12 +237,16 @@ function DeviceSetupPage({ user }) {
         )}
 
         <button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? "등록 확인 중..." : isGuest ? "데모 장비 연결" : "장비 연결하고 제어 시작"}
+          {isSubmitting
+            ? "등록 확인 중..."
+            : isGuest
+              ? "게스트 장비 연결"
+              : "장비 연결하고 제어 시작"}
         </button>
       </form>
 
       <p className="device-setup-note">
-        등록 코드는 한 번 사용하면 폐기되며 장비 비밀키는 브라우저나 이메일로 전달되지 않습니다.
+        장비 번호는 장비를 구분하고, 일회용 코드는 해당 장비의 등록 권한을 확인하는 데 사용됩니다.
       </p>
     </section>
   );
