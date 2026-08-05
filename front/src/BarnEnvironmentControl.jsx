@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import DeviceSharingPanel from "./DeviceSharingPanel.jsx";
 
 const CONTROL_API_URL =
   import.meta.env.VITE_CONTROL_API_URL ??
@@ -364,6 +365,8 @@ function BarnEnvironmentControl() {
           )}
         </div>
       </div>
+
+      <DeviceSharingPanel device={device} />
 
       <div className="sensor-grid">
         {sensorCards.map((sensor) => (

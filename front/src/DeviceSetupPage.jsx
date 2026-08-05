@@ -12,8 +12,10 @@ const PUBLIC_DEVICE_NUMBER = "COWOW-0001";
 function DeviceSetupPage({ user }) {
   const navigate = useNavigate();
   const isGuest = user?.loginType === "guest";
+  const [setupMode, setSetupMode] = useState("register");
   const [deviceNumber, setDeviceNumber] = useState(isGuest ? "guest" : "");
   const [claimCode, setClaimCode] = useState(isGuest ? "guest" : "");
+  const [shareCode, setShareCode] = useState("");
   const [barnName, setBarnName] = useState("1번 축사");
   const [isSendingCode, setIsSendingCode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -137,6 +139,48 @@ function DeviceSetupPage({ user }) {
     }
   };
 
+  const joinSharedDevice = async (event) => {
+    event.preventDefault();
+
+    if (!shareCode.trim()) {
+      setMessageType("error");
+      setMessage("이메일로 받은 공유 인증 코드를 입력해 주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setMessage("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/devices/share/join`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shareCode: shareCode.trim() }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail ?? "가족 공유 장비 연결에 실패했습니다.");
+      }
+
+      localStorage.setItem(
+        DEVICE_STORAGE_KEY,
+        JSON.stringify({
+          ...data.device,
+          registeredAt: new Date().toISOString(),
+        }),
+      );
+
+      navigate("/control", { replace: true });
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   return (
     <section className="device-setup-page">
       <div className="device-setup-header">
@@ -173,6 +217,62 @@ function DeviceSetupPage({ user }) {
         </li>
       </ol>
 
+      {!isGuest && (
+        <div className="device-setup-mode" role="tablist" aria-label="장비 연결 방식">
+          <button
+            className={setupMode === "register" ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-selected={setupMode === "register"}
+            onClick={() => {
+              setSetupMode("register");
+              setMessage("");
+            }}
+          >
+            내 장비 등록
+          </button>
+          <button
+            className={setupMode === "share" ? "active" : ""}
+            type="button"
+            role="tab"
+            aria-selected={setupMode === "share"}
+            onClick={() => {
+              setSetupMode("share");
+              setMessage("");
+            }}
+          >
+            가족 공유 참여
+          </button>
+        </div>
+      )}
+
+      {setupMode === "share" && !isGuest ? (
+        <form className="device-claim-form shared-device-join-form" onSubmit={joinSharedDevice}>
+          <div className="shared-device-join-guide">
+            <strong>장비 번호 없이 연결할 수 있습니다.</strong>
+            <p>관리자가 내 로그인 이메일로 보낸 일회용 인증 코드만 입력하세요.</p>
+          </div>
+
+          <label>
+            <span>가족 공유 인증 코드</span>
+            <input
+              value={shareCode}
+              placeholder="예: F7K2-M9Q4"
+              autoCapitalize="characters"
+              autoComplete="one-time-code"
+              onChange={(event) => setShareCode(event.target.value.toUpperCase())}
+            />
+          </label>
+
+          {message && (
+            <p className={`device-setup-message ${messageType}`}>{message}</p>
+          )}
+
+          <button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "공유 권한 확인 중..." : "공유 장비 연결"}
+          </button>
+        </form>
+      ) : (
       <form className="device-claim-form" onSubmit={registerDevice}>
         <label>
           <span>장비 번호</span>
@@ -238,6 +338,7 @@ function DeviceSetupPage({ user }) {
               : "장비 연결하고 제어 시작"}
         </button>
       </form>
+      )}
 
       <p className="device-setup-note">
         장비 번호는 장비를 구분하고, 일회용 코드는 해당 장비의 등록 권한을 확인하는 데 사용됩니다.
