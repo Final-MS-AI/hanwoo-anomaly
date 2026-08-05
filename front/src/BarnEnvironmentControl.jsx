@@ -69,6 +69,8 @@ function BarnEnvironmentControl() {
     }
   });
   const [sensors, setSensors] = useState(initialSensors);
+  const [isDeviceOnline, setIsDeviceOnline] = useState(false);
+  const [lastSeenAt, setLastSeenAt] = useState(null);
   const [mode, setMode] = useState("auto");
   const [fanLevel, setFanLevel] = useState(2);
   const [isSpraying, setIsSpraying] = useState(false);
@@ -87,22 +89,64 @@ function BarnEnvironmentControl() {
   );
 
   const warnings = sensorCards.filter((sensor) => sensor.level !== "normal");
+  const lastSeenLabel = lastSeenAt
+    ? new Date(lastSeenAt).toLocaleTimeString("ko-KR", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "확인 중";
 
   useEffect(() => {
-    const sensorTimer = window.setInterval(() => {
-      setSensors((previous) => ({
-        temperature: Math.max(20, previous.temperature + (Math.random() - 0.52) * 0.3),
-        humidity: Math.max(40, Math.min(95, previous.humidity + (Math.random() - 0.5) * 1.2)),
-        ammonia: Math.max(5, previous.ammonia + (Math.random() - 0.48) * 0.5),
-        carbonDioxide: Math.max(500, previous.carbonDioxide + (Math.random() - 0.5) * 24),
-      }));
-    }, 8000);
+    if (!device?.deviceId || !CONTROL_API_URL) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+
+    const loadDeviceState = async () => {
+      try {
+        const response = await fetch(
+          `${CONTROL_API_URL}/devices/${encodeURIComponent(device.deviceId)}/state`,
+          { credentials: "include" },
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.detail ?? "센서값 조회에 실패했습니다.");
+        }
+
+        if (isCancelled) return;
+
+        setIsDeviceOnline(Boolean(data.online));
+        setLastSeenAt(data.lastSeenAt ?? null);
+        setSensors((previous) => ({
+          temperature:
+            data.sensors?.temperature ?? previous.temperature,
+          humidity:
+            data.sensors?.humidity ?? previous.humidity,
+          ammonia:
+            data.sensors?.ammonia ?? previous.ammonia,
+          carbonDioxide:
+            data.sensors?.carbonDioxide ?? previous.carbonDioxide,
+        }));
+      } catch (error) {
+        if (!isCancelled) {
+          setIsDeviceOnline(false);
+          console.error("Device state error:", error);
+        }
+      }
+    };
+
+    loadDeviceState();
+    const sensorTimer = window.setInterval(loadDeviceState, 5000);
 
     return () => {
+      isCancelled = true;
       window.clearInterval(sensorTimer);
       if (sprayTimerRef.current) window.clearTimeout(sprayTimerRef.current);
     };
-  }, []);
+  }, [device?.deviceId]);
 
   useEffect(() => {
     if (mode !== "auto") return;
@@ -184,11 +228,17 @@ function BarnEnvironmentControl() {
           <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
         </div>
         <button
-          className={`sensor-connection-badge ${device ? "connected" : ""}`}
+          className={`sensor-connection-badge ${isDeviceOnline ? "connected" : ""}`}
           type="button"
           onClick={() => navigate("/devices/setup")}
         >
-          {device ? "● 원격 연결" : CONTROL_API_URL ? "장비 등록" : "데모 데이터"}
+          {device
+            ? isDeviceOnline
+              ? "● 원격 연결"
+              : "○ 연결 확인 중"
+            : CONTROL_API_URL
+              ? "장비 등록"
+              : "데모 데이터"}
         </button>
       </div>
 
@@ -199,7 +249,7 @@ function BarnEnvironmentControl() {
             <strong>{device ? device.deviceName ?? device.deviceId : "ESP32 게이트웨이를 등록해 주세요"}</strong>
             <p>
               {device
-                ? `ESP32 → ${device.networkName || "핫스팟"} → MQTT 서버 → 현재 기기`
+                ? `ESP32 → ${device.networkName || "핫스팟"} → HTTPS 서버 → 현재 기기`
                 : "최초 한 번 등록하면 모바일 데이터에서도 원격 제어할 수 있습니다."}
             </p>
           </div>
@@ -207,8 +257,8 @@ function BarnEnvironmentControl() {
         <div className="remote-connection-meta">
           {device ? (
             <>
-              <span><i /> 온라인</span>
-              <small>마지막 통신 방금 전</small>
+              <span><i /> {isDeviceOnline ? "온라인" : "오프라인"}</span>
+              <small>마지막 통신 {lastSeenLabel}</small>
             </>
           ) : (
             <button type="button" onClick={() => navigate("/devices/setup")}>장비 등록하기</button>
