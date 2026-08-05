@@ -77,7 +77,6 @@ function BarnEnvironmentControl() {
   const [isSpraying, setIsSpraying] = useState(false);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
-  const [wasDisconnected, setWasDisconnected] = useState(false);
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const sprayTimerRef = useRef(null);
 
@@ -123,7 +122,6 @@ function BarnEnvironmentControl() {
         if (!registeredDevice) return;
 
         setDevice(registeredDevice);
-        setWasDisconnected(false);
         localStorage.setItem(
           DEVICE_STORAGE_KEY,
           JSON.stringify(registeredDevice),
@@ -288,7 +286,6 @@ function BarnEnvironmentControl() {
       setSensors(initialSensors);
       setIsDeviceOnline(false);
       setLastSeenAt(null);
-      setWasDisconnected(true);
     } catch (error) {
       setControlMessage(error.message);
     } finally {
@@ -308,9 +305,7 @@ function BarnEnvironmentControl() {
           className={`sensor-connection-badge ${
             device
               ? "disconnect-action"
-              : wasDisconnected
-                ? "disconnected"
-                : ""
+              : "disconnected"
           }`}
           type="button"
           disabled={isDisconnecting}
@@ -320,11 +315,7 @@ function BarnEnvironmentControl() {
             ? "해제 중..."
             : device
               ? "연결 해제"
-              : wasDisconnected
-                ? "연결 해제됨"
-                : CONTROL_API_URL
-                  ? "장비 등록"
-                  : "데모 데이터"}
+              : "연결하기"}
         </button>
       </div>
 
