@@ -77,6 +77,7 @@ function BarnEnvironmentControl() {
   const [isSpraying, setIsSpraying] = useState(false);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [wasDisconnected, setWasDisconnected] = useState(false);
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const sprayTimerRef = useRef(null);
 
@@ -122,6 +123,7 @@ function BarnEnvironmentControl() {
         if (!registeredDevice) return;
 
         setDevice(registeredDevice);
+        setWasDisconnected(false);
         localStorage.setItem(
           DEVICE_STORAGE_KEY,
           JSON.stringify(registeredDevice),
@@ -286,7 +288,7 @@ function BarnEnvironmentControl() {
       setSensors(initialSensors);
       setIsDeviceOnline(false);
       setLastSeenAt(null);
-      navigate("/devices/setup", { replace: true });
+      setWasDisconnected(true);
     } catch (error) {
       setControlMessage(error.message);
     } finally {
@@ -303,17 +305,26 @@ function BarnEnvironmentControl() {
           <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
         </div>
         <button
-          className={`sensor-connection-badge ${isDeviceOnline ? "connected" : ""}`}
+          className={`sensor-connection-badge ${
+            device
+              ? "disconnect-action"
+              : wasDisconnected
+                ? "disconnected"
+                : ""
+          }`}
           type="button"
-          onClick={() => navigate("/devices/setup")}
+          disabled={isDisconnecting}
+          onClick={device ? disconnectDevice : () => navigate("/devices/setup")}
         >
-          {device
-            ? isDeviceOnline
-              ? "● 원격 연결"
-              : "○ 연결 확인 중"
-            : CONTROL_API_URL
-              ? "장비 등록"
-              : "데모 데이터"}
+          {isDisconnecting
+            ? "해제 중..."
+            : device
+              ? "연결 해제"
+              : wasDisconnected
+                ? "연결 해제됨"
+                : CONTROL_API_URL
+                  ? "장비 등록"
+                  : "데모 데이터"}
         </button>
       </div>
 
@@ -334,14 +345,6 @@ function BarnEnvironmentControl() {
             <>
               <span><i /> {isDeviceOnline ? "온라인" : "오프라인"}</span>
               <small>마지막 통신 {lastSeenLabel}</small>
-              <button
-                className="device-disconnect-button"
-                type="button"
-                disabled={isDisconnecting}
-                onClick={disconnectDevice}
-              >
-                {isDisconnecting ? "해제 중..." : "연결 해제"}
-              </button>
             </>
           ) : (
             <button type="button" onClick={() => navigate("/devices/setup")}>장비 등록하기</button>

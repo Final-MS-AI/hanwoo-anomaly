@@ -112,6 +112,26 @@
   background: #e4f3e8;
 }
 
+.sensor-connection-badge.disconnect-action {
+  color: #9b4037;
+  background: #fff1ef;
+  border: 1px solid #dfb3ad;
+}
+
+.sensor-connection-badge.disconnect-action:hover {
+  background: #ffe7e3;
+}
+
+.sensor-connection-badge.disconnected {
+  color: #7d7167;
+  background: #eeeae5;
+}
+
+.sensor-connection-badge:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .remote-connection-card {
   display: flex;
   align-items: center;
@@ -198,25 +218,6 @@
   border-radius: 9px;
   font-weight: 800;
   cursor: pointer;
-}
-
-.remote-connection-meta .device-disconnect-button {
-  min-height: 30px;
-  margin-top: 5px;
-  padding: 0 10px;
-  color: #a13f35;
-  background: #fff;
-  border: 1px solid #d8aaa4;
-  font-size: 10px;
-}
-
-.remote-connection-meta .device-disconnect-button:hover {
-  background: #fff4f2;
-}
-
-.remote-connection-meta .device-disconnect-button:disabled {
-  cursor: wait;
-  opacity: 0.55;
 }
 
 .device-setup-page {
@@ -1361,13 +1362,7 @@
     padding-left: 46px;
   }
 
-  .remote-connection-meta > button:not(.device-disconnect-button) { width: 100%; }
-
-  .remote-connection-meta .device-disconnect-button {
-    width: auto;
-    margin-top: 0;
-    margin-left: auto;
-  }
+  .remote-connection-meta > button { width: 100%; }
 
   .device-setup-page {
     width: calc(100% - 24px);
