@@ -276,7 +276,7 @@ function BarnEnvironmentControl() {
         body: JSON.stringify({ deviceId: device.deviceId }),
       });
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 404) {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.detail ?? "장비 연결 해제에 실패했습니다.");
       }
