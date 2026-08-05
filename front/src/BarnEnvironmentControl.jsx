@@ -77,6 +77,7 @@ function BarnEnvironmentControl() {
   const [isSpraying, setIsSpraying] = useState(false);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectError, setDisconnectError] = useState("");
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const sprayTimerRef = useRef(null);
 
@@ -261,12 +262,8 @@ function BarnEnvironmentControl() {
   const disconnectDevice = async () => {
     if (!device || isDisconnecting) return;
 
-    const shouldDisconnect = window.confirm(
-      "장비 연결을 해제할까요? 다시 사용하려면 장비 등록이 필요합니다.",
-    );
-    if (!shouldDisconnect) return;
-
     setIsDisconnecting(true);
+    setDisconnectError("");
 
     try {
       const response = await fetch(`${CONTROL_API_URL}/devices/connection`, {
@@ -287,6 +284,7 @@ function BarnEnvironmentControl() {
       setIsDeviceOnline(false);
       setLastSeenAt(null);
     } catch (error) {
+      setDisconnectError(error.message);
       setControlMessage(error.message);
     } finally {
       setIsDisconnecting(false);
@@ -301,22 +299,29 @@ function BarnEnvironmentControl() {
           <h2>축사 환경 제어</h2>
           <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
         </div>
-        <button
-          className={`sensor-connection-badge ${
-            device
-              ? "disconnect-action"
-              : "disconnected"
-          }`}
-          type="button"
-          disabled={isDisconnecting}
-          onClick={device ? disconnectDevice : () => navigate("/devices/setup")}
-        >
-          {isDisconnecting
-            ? "해제 중..."
-            : device
-              ? "연결 해제"
-              : "연결하기"}
-        </button>
+        <div className="connection-action-area">
+          <button
+            className={`sensor-connection-badge ${
+              device
+                ? "disconnect-action"
+                : "disconnected"
+            }`}
+            type="button"
+            disabled={isDisconnecting}
+            onClick={device ? disconnectDevice : () => navigate("/devices/setup")}
+          >
+            {isDisconnecting
+              ? "해제 중..."
+              : device
+                ? "연결 해제"
+                : "연결하기"}
+          </button>
+          {disconnectError && (
+            <small className="connection-action-error" role="alert">
+              {disconnectError}
+            </small>
+          )}
+        </div>
       </div>
 
       <div className={`remote-connection-card ${device ? "connected" : "unregistered"}`}>
