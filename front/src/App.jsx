@@ -807,7 +807,7 @@ function DashboardPage({ user, setUser }) {
       )}
 
       {location.pathname === "/devices/setup" && (
-        <DeviceSetupPage />
+        <DeviceSetupPage user={user} />
       )}
 
       <BottomNavigation />

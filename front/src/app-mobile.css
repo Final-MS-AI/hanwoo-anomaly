@@ -310,6 +310,60 @@
   border-color: transparent;
 }
 
+.device-claim-form input:read-only {
+  color: #347448;
+  background: #f2f7f3;
+  font-weight: 800;
+}
+
+.device-account-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px;
+  background: #f4f8f4;
+  border-radius: 12px;
+}
+
+.device-account-card > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.device-account-card span {
+  color: #7a6d61;
+  font-size: 10px;
+}
+
+.device-account-card strong {
+  overflow: hidden;
+  color: #315e3e;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.device-send-code-button {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 0 12px;
+  color: #326f43;
+  background: #fff;
+  border: 1px solid #8fb49a;
+  border-radius: 9px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.device-send-code-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .device-form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -328,6 +382,7 @@
 
 .device-claim-form > button:disabled { opacity: 0.6; cursor: wait; }
 .device-setup-message { margin: 0; color: #a33d32; font-size: 12px; }
+.device-setup-message.success { color: #347448; }
 .device-setup-note { margin: 10px 4px 0; color: #938679; font-size: 10px; }
 
 .sensor-grid {
@@ -1309,6 +1364,13 @@
 
   .device-claim-form { padding: 14px; }
   .device-form-row { grid-template-columns: 1fr; }
+
+  .device-account-card {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .device-send-code-button { width: 100%; }
 }
 
 @media (max-width: 360px) {

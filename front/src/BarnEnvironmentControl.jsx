@@ -62,7 +62,7 @@ function getSensorLevel(value, sensor) {
 
 function BarnEnvironmentControl() {
   const navigate = useNavigate();
-  const [device] = useState(() => {
+  const [device, setDevice] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(DEVICE_STORAGE_KEY)) ?? null;
     } catch {
@@ -100,6 +100,40 @@ function BarnEnvironmentControl() {
         second: "2-digit",
       })
     : "확인 중";
+
+  useEffect(() => {
+    if (!CONTROL_API_URL) return undefined;
+
+    const controller = new AbortController();
+
+    fetch(`${CONTROL_API_URL}/devices/mine`, {
+      credentials: "include",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.detail ?? "등록 장비 조회에 실패했습니다.");
+        }
+        return data.devices?.[0] ?? null;
+      })
+      .then((registeredDevice) => {
+        if (!registeredDevice) return;
+
+        setDevice(registeredDevice);
+        localStorage.setItem(
+          DEVICE_STORAGE_KEY,
+          JSON.stringify(registeredDevice),
+        );
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error("Registered device error:", error);
+        }
+      });
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     if (!device?.deviceId || !CONTROL_API_URL) {
