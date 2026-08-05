@@ -7,16 +7,14 @@ const API_BASE_URL =
   "";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const SHOULD_USE_DEVICE_API = import.meta.env.PROD || Boolean(API_BASE_URL);
-const DEVICE_NUMBER_PATTERN = /^COWOW-(000[1-9]|0010)$/;
-const DEVICE_NUMBERS = Array.from(
-  { length: 10 },
-  (_, index) => `COWOW-${String(index + 1).padStart(4, "0")}`,
-);
+const PUBLIC_DEVICE_NUMBER = "COWOW-0001";
 
 function DeviceSetupPage({ user }) {
   const navigate = useNavigate();
   const isGuest = user?.loginType === "guest";
-  const [deviceNumber, setDeviceNumber] = useState(isGuest ? "guest" : "");
+  const [deviceNumber] = useState(
+    isGuest ? "guest" : PUBLIC_DEVICE_NUMBER,
+  );
   const [claimCode, setClaimCode] = useState(isGuest ? "guest" : "");
   const [barnName, setBarnName] = useState("1번 축사");
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -29,12 +27,15 @@ function DeviceSetupPage({ user }) {
     : deviceNumber.trim().toUpperCase();
 
   const validateDeviceNumber = () => {
-    if (isGuest || DEVICE_NUMBER_PATTERN.test(normalizedDeviceNumber)) {
+    if (
+      (isGuest && normalizedDeviceNumber === "guest") ||
+      normalizedDeviceNumber === PUBLIC_DEVICE_NUMBER
+    ) {
       return true;
     }
 
     setMessageType("error");
-    setMessage("장비 번호는 COWOW-0001부터 COWOW-0010까지 입력할 수 있습니다.");
+    setMessage("사용할 수 있는 장비 번호는 COWOW-0001입니다.");
     return false;
   };
 
@@ -179,19 +180,10 @@ function DeviceSetupPage({ user }) {
           <span>장비 번호</span>
           <input
             value={deviceNumber}
-            readOnly={isGuest}
-            list={isGuest ? undefined : "cowow-device-numbers"}
+            readOnly
             placeholder="예: COWOW-0001"
             autoCapitalize="characters"
-            onChange={(event) => setDeviceNumber(event.target.value.toUpperCase())}
           />
-          {!isGuest && (
-            <datalist id="cowow-device-numbers">
-              {DEVICE_NUMBERS.map((number) => (
-                <option key={number} value={number} />
-              ))}
-            </datalist>
-          )}
         </label>
 
         <div className="device-account-card">
