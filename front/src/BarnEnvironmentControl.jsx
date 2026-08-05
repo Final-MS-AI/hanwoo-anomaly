@@ -299,29 +299,23 @@ function BarnEnvironmentControl() {
           <h2>축사 환경 제어</h2>
           <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
         </div>
-        <div className="connection-action-area">
-          <button
-            className={`sensor-connection-badge ${
-              device
-                ? "disconnect-action"
-                : "disconnected"
-            }`}
-            type="button"
-            disabled={isDisconnecting}
-            onClick={device ? disconnectDevice : () => navigate("/devices/setup")}
-          >
-            {isDisconnecting
-              ? "해제 중..."
-              : device
-                ? "연결 해제"
-                : "연결하기"}
-          </button>
-          {disconnectError && (
-            <small className="connection-action-error" role="alert">
-              {disconnectError}
-            </small>
-          )}
-        </div>
+        {device && (
+          <div className="connection-action-area">
+            <button
+              className="sensor-connection-badge disconnect-action"
+              type="button"
+              disabled={isDisconnecting}
+              onClick={disconnectDevice}
+            >
+              {isDisconnecting ? "해제 중..." : "연결 해제"}
+            </button>
+            {disconnectError && (
+              <small className="connection-action-error" role="alert">
+                {disconnectError}
+              </small>
+            )}
+          </div>
+        )}
       </div>
 
       <div className={`remote-connection-card ${device ? "connected" : "unregistered"}`}>
