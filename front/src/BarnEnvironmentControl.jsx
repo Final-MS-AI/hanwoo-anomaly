@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const CONTROL_API_URL =
@@ -188,21 +188,7 @@ function BarnEnvironmentControl() {
     };
   }, [device?.deviceId]);
 
-  useEffect(() => {
-    if (mode !== "auto") return;
-
-    const recommendedLevel =
-      sensors.ammonia >= 25 || sensors.temperature >= 32
-        ? 3
-        : sensors.ammonia >= 20 || sensors.temperature >= 28
-          ? 2
-          : 1;
-
-    setFanLevel(recommendedLevel);
-    setControlMessage(`센서 기준으로 환기팬 ${recommendedLevel}단계를 자동 유지합니다.`);
-  }, [mode, sensors.ammonia, sensors.temperature]);
-
-  const sendControlCommand = async (actuator, value) => {
+  const sendControlCommand = useCallback(async (actuator, value) => {
     if (!CONTROL_API_URL) return;
 
     const response = await fetch(`${CONTROL_API_URL}/actuators`, {
@@ -217,7 +203,44 @@ function BarnEnvironmentControl() {
     });
 
     if (!response.ok) throw new Error("장비 제어 명령 전송에 실패했습니다.");
-  };
+  }, [device?.deviceId]);
+
+  useEffect(() => {
+    if (mode !== "auto" || !device?.deviceId) return undefined;
+
+    const recommendedLevel =
+      sensors.ammonia >= 25 || sensors.temperature >= 32
+        ? 3
+        : sensors.ammonia >= 20 || sensors.temperature >= 28
+          ? 2
+          : 1;
+
+    let isCancelled = false;
+    setFanLevel(recommendedLevel);
+    setControlMessage(`환기팬 ${recommendedLevel}단계 명령을 전송하는 중입니다.`);
+
+    sendControlCommand("ventilation_fan", recommendedLevel)
+      .then(() => {
+        if (!isCancelled) {
+          setControlMessage(
+            `센서 기준으로 환기팬 ${recommendedLevel}단계를 자동 유지합니다.`,
+          );
+        }
+      })
+      .catch((error) => {
+        if (!isCancelled) setControlMessage(error.message);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [
+    device?.deviceId,
+    mode,
+    sendControlCommand,
+    sensors.ammonia,
+    sensors.temperature,
+  ]);
 
   const changeFanLevel = async (level) => {
     if (mode === "auto") return;
