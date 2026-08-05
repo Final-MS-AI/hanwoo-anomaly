@@ -40,6 +40,7 @@ function DeviceSetupPage() {
       if (import.meta.env.VITE_DEVICE_API_URL) {
         const response = await fetch(`${API_BASE_URL}/devices/claim`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
