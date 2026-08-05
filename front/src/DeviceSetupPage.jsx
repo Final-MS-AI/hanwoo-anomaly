@@ -33,7 +33,7 @@ function DeviceSetupPage({ user }) {
     }
 
     setMessageType("error");
-    setMessage("사용할 수 있는 장비 번호는 COWOW-0001입니다.");
+    setMessage("잘못된 장비 번호입니다.");
     return false;
   };
 
