@@ -47,17 +47,21 @@
   opacity: 0.65;
 }
 
-.native-google-logo {
-  display: inline-flex;
-  flex: 0 0 18px;
-  width: 18px;
-  height: 18px;
-}
-
-.native-google-logo svg {
-  display: block;
-  width: 18px;
-  height: 18px;
+.google-login-config-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 32px;
+  margin: 0;
+  padding: 0 8px;
+  color: #a13f35;
+  background: #fff4f2;
+  border: 1px solid #e2bbb6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  font-size: 10px;
+  text-align: center;
 }
 
 .google-login-wrapper > div,
