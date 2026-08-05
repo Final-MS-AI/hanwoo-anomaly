@@ -1,4 +1,7 @@
 ﻿{
+  "globalHeaders": {
+    "Cross-Origin-Opener-Policy": "same-origin-allow-popups"
+  },
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [

@@ -12,6 +12,28 @@ export function hasAndroidAuthBridge() {
   );
 }
 
+function normalizePictureUrl(value) {
+  if (typeof value !== "string" || !value) {
+    return null;
+  }
+
+  try {
+    const url = new URL(value);
+
+    if (
+      url.protocol === "http:" &&
+      (url.hostname === "kakaocdn.net" ||
+        url.hostname.endsWith(".kakaocdn.net"))
+    ) {
+      url.protocol = "https:";
+    }
+
+    return url.toString();
+  } catch {
+    return value;
+  }
+}
+
 function normalizeUser(payload) {
   const source = payload?.user ?? payload;
 
@@ -29,8 +51,9 @@ function normalizeUser(payload) {
       null,
     name: source.name ?? "사용자",
     email: source.email ?? "이메일 정보 없음",
-    picture:
-      source.picture ?? source.profile_image_url ?? null,
+    picture: normalizePictureUrl(
+      source.picture ?? source.profile_image_url,
+    ),
   };
 }
 
