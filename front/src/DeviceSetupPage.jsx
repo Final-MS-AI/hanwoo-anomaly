@@ -12,9 +12,7 @@ const PUBLIC_DEVICE_NUMBER = "COWOW-0001";
 function DeviceSetupPage({ user }) {
   const navigate = useNavigate();
   const isGuest = user?.loginType === "guest";
-  const [deviceNumber] = useState(
-    isGuest ? "guest" : PUBLIC_DEVICE_NUMBER,
-  );
+  const [deviceNumber, setDeviceNumber] = useState(isGuest ? "guest" : "");
   const [claimCode, setClaimCode] = useState(isGuest ? "guest" : "");
   const [barnName, setBarnName] = useState("1번 축사");
   const [isSendingCode, setIsSendingCode] = useState(false);
@@ -180,9 +178,13 @@ function DeviceSetupPage({ user }) {
           <span>장비 번호</span>
           <input
             value={deviceNumber}
-            readOnly
+            readOnly={isGuest}
             placeholder="예: COWOW-0001"
             autoCapitalize="characters"
+            autoComplete="off"
+            onChange={(event) => {
+              setDeviceNumber(event.target.value.toUpperCase());
+            }}
           />
         </label>
 
