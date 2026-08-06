@@ -26,11 +26,14 @@ import {
   useLocation,
 } from "react-router-dom";
 
-
+// 비문 API는 프론트가 두 도메인에서 서빙되므로 반드시 절대 주소로 고정한다.
 const MUZZLE_API = "https://hanwoo.koreacentral.cloudapp.azure.com";
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://hanwoo.koreacentral.cloudapp.azure.com";
+
+// 비문 등록 시 사진 간 일치도 판정에 쓰는 기준값 (백엔드와 동일)
+const MUZZLE_CONSISTENCY_THRESHOLD = 0.45;
 
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
@@ -38,34 +41,35 @@ function LoginPage({ user, setUser }) {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const isAndroidApp = hasAndroidAuthBridge();
 
-  const completeGoogleLogin = useCallback(async (credential) => {
-    try {
-      if (!credential) {
-        setErrorMessage("Google 인증 정보를 받지 못했습니다.");
-        return;
+  const completeGoogleLogin = useCallback(
+    async (credential) => {
+      try {
+        if (!credential) {
+          setErrorMessage("Google 인증 정보를 받지 못했습니다.");
+          return;
+        }
+
+        setErrorMessage("");
+        setIsLoggingIn(true);
+
+        const authenticatedUser = await exchangeGoogleCredential(credential);
+
+        setUser(authenticatedUser);
+
+        setErrorMessage("");
+        navigate("/dashboard");
+      } catch (error) {
+        console.error("Google login error:", error);
+
+        setErrorMessage(
+          error.message ?? "Google 로그인 정보를 처리하지 못했습니다.",
+        );
+      } finally {
+        setIsLoggingIn(false);
       }
-
-      setErrorMessage("");
-      setIsLoggingIn(true);
-
-      const authenticatedUser =
-        await exchangeGoogleCredential(credential);
-
-      setUser(authenticatedUser);
-
-      setErrorMessage("");
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("Google login error:", error);
-
-      setErrorMessage(
-        error.message ??
-          "Google 로그인 정보를 처리하지 못했습니다.",
-      );
-    } finally {
-      setIsLoggingIn(false);
-    }
-  }, [navigate, setUser]);
+    },
+    [navigate, setUser],
+  );
 
   const handleGoogleLogin = (credentialResponse) => {
     completeGoogleLogin(credentialResponse?.credential);
@@ -83,25 +87,15 @@ function LoginPage({ user, setUser }) {
     const handleNativeError = (event) => {
       setIsLoggingIn(false);
       setErrorMessage(
-        event.detail?.message ??
-          "Google 로그인에 실패했습니다.",
+        event.detail?.message ?? "Google 로그인에 실패했습니다.",
       );
     };
 
-    window.addEventListener(
-      "cowow:google-login",
-      handleNativeSuccess,
-    );
-    window.addEventListener(
-      "cowow:google-login-error",
-      handleNativeError,
-    );
+    window.addEventListener("cowow:google-login", handleNativeSuccess);
+    window.addEventListener("cowow:google-login-error", handleNativeError);
 
     return () => {
-      window.removeEventListener(
-        "cowow:google-login",
-        handleNativeSuccess,
-      );
+      window.removeEventListener("cowow:google-login", handleNativeSuccess);
       window.removeEventListener(
         "cowow:google-login-error",
         handleNativeError,
@@ -121,6 +115,7 @@ function LoginPage({ user, setUser }) {
       setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
     }
   };
+
   const handleGuestLogin = async () => {
     try {
       setErrorMessage("");
@@ -131,9 +126,7 @@ function LoginPage({ user, setUser }) {
       navigate("/dashboard");
     } catch (error) {
       console.error("Guest login error:", error);
-      setErrorMessage(
-        error.message ?? "게스트 로그인에 실패했습니다.",
-      );
+      setErrorMessage(error.message ?? "게스트 로그인에 실패했습니다.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -160,10 +153,6 @@ function LoginPage({ user, setUser }) {
           />
         </div>
 
-        
-
-        
-
         <div className="social-login-buttons">
           <div className="google-login-wrapper">
             {isAndroidApp ? (
@@ -173,15 +162,15 @@ function LoginPage({ user, setUser }) {
                 onClick={handleNativeGoogleLogin}
                 disabled={isLoggingIn}
               >
-                <span>{isLoggingIn ? "Google 로그인 중" : "Google로 로그인"}</span>
+                <span>
+                  {isLoggingIn ? "Google 로그인 중" : "Google로 로그인"}
+                </span>
               </button>
             ) : GOOGLE_CLIENT_ID ? (
               <GoogleLogin
                 onSuccess={handleGoogleLogin}
                 onError={() => {
-                  setErrorMessage(
-                    "Google 로그인에 실패했습니다.",
-                  );
+                  setErrorMessage("Google 로그인에 실패했습니다.");
                 }}
                 text="signin"
                 locale="ko"
@@ -203,10 +192,7 @@ function LoginPage({ user, setUser }) {
             }}
             aria-label="카카오 로그인"
           >
-            <img
-              src="/kakao-login.png"
-              alt="카카오 로그인"
-            />
+            <img src="/kakao-login.png" alt="카카오 로그인" />
           </button>
 
           <button
@@ -217,9 +203,7 @@ function LoginPage({ user, setUser }) {
             }}
             aria-label="네이버 로그인"
           >
-            <span className="social-provider-logo naver-logo">
-              N
-            </span>
+            <span className="social-provider-logo naver-logo">N</span>
             <span>로그인</span>
           </button>
         </div>
@@ -237,26 +221,45 @@ function LoginPage({ user, setUser }) {
           {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
         </button>
 
-        {errorMessage && (
-          <p className="error-message">{errorMessage}</p>
-        )}
+        {errorMessage && <p className="error-message">{errorMessage}</p>}
       </section>
     </main>
   );
 }
 
-function RegisterCattleModal({
-  onClose,
-  onRegistered,
-  embedded = false,
-}) {
+function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
+  // ── 비문 사진 상태는 이 컴포넌트에 단 한 번만 선언한다 ──
+  const [muzzleFiles, setMuzzleFiles] = useState([]);
+  const [muzzlePreviews, setMuzzlePreviews] = useState([]);
+  const [enrollResult, setEnrollResult] = useState(null);
+
   const [earTagImage, setEarTagImage] = useState(null);
-  const [muzzleImage, setMuzzleImage] = useState(null);
   const [earTagNumber, setEarTagNumber] = useState("");
   const [ocrStatus, setOcrStatus] = useState("idle");
   const [ocrMessage, setOcrMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // 썸네일 URL은 파일이 바뀔 때만 만들고, 바뀌면 이전 것을 해제한다(메모리 누수 방지).
+  useEffect(() => {
+    if (muzzleFiles.length === 0) {
+      setMuzzlePreviews([]);
+      return undefined;
+    }
+
+    const urls = muzzleFiles.map((file) => URL.createObjectURL(file));
+    setMuzzlePreviews(urls);
+
+    return () => {
+      urls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [muzzleFiles]);
+
+  const handleMuzzleFilesChange = (event) => {
+    setMuzzleFiles(Array.from(event.target.files ?? []));
+    setEnrollResult(null);
+    setErrorMessage("");
+  };
 
   const handleEarTagImageChange = async (event) => {
     const file = event.target.files?.[0] ?? null;
@@ -285,28 +288,23 @@ function RegisterCattleModal({
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(
-          result.detail ?? "귀표 번호 인식에 실패했습니다.",
-        );
+        throw new Error(result.detail ?? "귀표 번호 인식에 실패했습니다.");
       }
 
       setEarTagNumber(result.ear_tag_number ?? "");
       setOcrStatus("success");
-      setOcrMessage(
-        "사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.",
-      );
+      setOcrMessage("사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.");
     } catch (error) {
       console.error("Ear tag OCR error:", error);
       setOcrStatus("error");
-      setOcrMessage(
-        "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
-      );
+      setOcrMessage("자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.");
     }
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
+    setEnrollResult(null);
 
     const normalizedEarTagNumber = earTagNumber.trim();
 
@@ -320,93 +318,122 @@ function RegisterCattleModal({
       return;
     }
 
-    if (!muzzleImage) {
-      setErrorMessage("비문 사진을 선택해 주세요.");
+    if (muzzleFiles.length === 0) {
+      setErrorMessage("비문 사진을 1장 이상 선택해 주세요.");
       return;
     }
 
     setIsSubmitting(true);
 
+    // 가축이력번호는 숫자만 남겨 12자리 문자열로 통일한다(귀표 OCR이 9자리를 주는 경우 대비).
+    const nationalId = normalizedEarTagNumber
+      .replace(/\D/g, "")
+      .slice(-12)
+      .padStart(12, "0");
+
+    // ── ① 비문 임베딩 등록 (개체 식별 파트) — /cattle 보다 먼저 호출한다 ──
+    let muzzleOk = false;
+
+    try {
+      const muzzleForm = new FormData();
+      muzzleForm.append("national_id", nationalId);
+      muzzleForm.append("barn_id", "");
+      muzzleFiles.forEach((file) => muzzleForm.append("files", file));
+
+      // Content-Type을 직접 지정하지 않는다. 브라우저가 boundary와 함께 자동 설정한다.
+      const muzzleResponse = await fetch(`${MUZZLE_API}/muzzle/enroll`, {
+        method: "POST",
+        body: muzzleForm,
+      });
+
+      let payload = null;
+      try {
+        payload = await muzzleResponse.json();
+      } catch {
+        payload = null;
+      }
+
+      if (muzzleResponse.ok) {
+        muzzleOk = true;
+        setEnrollResult({ status: "success", data: payload ?? {} });
+        console.log("[비문] 등록 완료:", payload);
+      } else if (
+        muzzleResponse.status === 422 &&
+        payload?.detail?.error === "inconsistent_images"
+      ) {
+        setEnrollResult({
+          status: "inconsistent",
+          message:
+            payload.detail.message ??
+            "사진들이 서로 다른 개체로 판정되었습니다. 같은 소의 코 사진만 넣어 주세요.",
+        });
+        console.warn("[비문] 사진 일치도 미달:", payload.detail);
+      } else {
+        setEnrollResult({
+          status: "error",
+          message: `비문 등록에 실패했습니다. (HTTP ${muzzleResponse.status})`,
+        });
+        console.error("[비문] 등록 실패", muzzleResponse.status, payload);
+      }
+    } catch (error) {
+      setEnrollResult({
+        status: "error",
+        message: `비문 API에 연결하지 못했습니다. (${error.message})`,
+      });
+      console.error("[비문] 등록 오류:", error);
+    }
+
+    // 비문 등록이 실패하면 개체 정보만 저장하지 않는다(사진을 고쳐 다시 시도).
+    if (!muzzleOk) {
+      setIsSubmitting(false);
+      return;
+    }
+
+    // ── ② 팀원 백엔드 개체 등록 — 여기서 실패해도 위 비문 등록은 이미 완료됐다 ──
     try {
       const formData = new FormData();
-
-      formData.append(
-        "ear_tag_number",
-        normalizedEarTagNumber,
-      );
+      formData.append("ear_tag_number", normalizedEarTagNumber);
       formData.append("ear_tag_image", earTagImage);
-      formData.append("muzzle_image", muzzleImage);
-
-      // ── 비문 임베딩 등록 (개체 식별 파트) ──
-      let muzzleOk = false;
-      const muzzleInput = event.target.elements.muzzle_files;
-      const muzzleFiles = muzzleInput ? Array.from(muzzleInput.files) : [];
-      const nationalId = normalizedEarTagNumber
-        .replace(/\D/g, "")
-        .slice(-12)
-        .padStart(12, "0");
-
-      if (muzzleFiles.length > 0) {
-        try {
-          const muzzleForm = new FormData();
-          muzzleForm.append("national_id", nationalId);
-          muzzleForm.append("barn_id", "");
-          muzzleFiles.forEach((f) => muzzleForm.append("files", f));
-
-          const muzzleRes = await fetch(`${MUZZLE_API}/muzzle/enroll`, {
-            method: "POST",
-            body: muzzleForm,
-          });
-
-          if (muzzleRes.ok) {
-            muzzleOk = true;
-            console.log("[비문] 등록 완료:", await muzzleRes.json());
-          } else {
-            console.error("[비문] 등록 실패", muzzleRes.status, await muzzleRes.text());
-          }
-        } catch (err) {
-          console.error("[비문] 등록 오류:", err);
-        }
-      } else {
-        console.warn("[비문] 사진이 선택되지 않아 건너뜀");
-      }
+      formData.append("muzzle_image", muzzleFiles[0]); // 팀원 백엔드는 1장만 받는다
 
       const response = await fetch(`${API_BASE_URL}/cattle`, {
         method: "POST",
         body: formData,
       });
 
-      const result = await response.json();
+      let result = null;
+      try {
+        result = await response.json();
+      } catch {
+        result = null;
+      }
 
       if (!response.ok) {
-        throw new Error(result.detail ?? "소 등록에 실패했습니다.");
+        const detail =
+          typeof result?.detail === "string" ? result.detail : null;
+        throw new Error(
+          detail ?? `개체 정보 저장에 실패했습니다. (HTTP ${response.status})`,
+        );
       }
 
       onRegistered(result);
       onClose();
     } catch (error) {
       console.error("Cattle registration error:", error);
-      setErrorMessage(error.message);
-    } finally {
+      setErrorMessage(
+      "비문 등록은 완료되었습니다. 개체 기본정보 저장은 백엔드 준비 중입니다.",
+    );
       setIsSubmitting(false);
     }
   };
 
+  const enrollData = enrollResult?.status === "success" ? enrollResult.data : null;
+  const consistency =
+    typeof enrollData?.consistency === "number" ? enrollData.consistency : null;
+
   return (
-    <div
-      className={
-        embedded
-          ? "register-page-container"
-          : "modal-backdrop"
-      }
-    >
-      <section
-        className={
-          embedded
-            ? "register-page-card"
-            : "modal-card"
-        }
-      >
+    <div className={embedded ? "register-page-container" : "modal-backdrop"}>
+      <section className={embedded ? "register-page-card" : "modal-card"}>
         <div className="modal-header">
           <h2>소 등록하기</h2>
           {!embedded && (
@@ -424,33 +451,26 @@ function RegisterCattleModal({
         <form className="cattle-form" onSubmit={handleSubmit}>
           <label className="image-upload-field">
             귀표 사진
-
             <span className="upload-description">
               귀표 번호가 선명하게 보이는 사진을 등록해 주세요.
             </span>
-
             <input
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={handleEarTagImageChange}
               required
             />
-
             {earTagImage && (
-              <span className="selected-file">
-                선택됨: {earTagImage.name}
-              </span>
+              <span className="selected-file">선택됨: {earTagImage.name}</span>
             )}
           </label>
 
           {earTagImage && (
             <label className="ocr-result-field">
               귀표 번호
-
               <span className="upload-description">
                 자동 인식 결과를 확인하고 틀리면 수정해 주세요.
               </span>
-
               <div className="ocr-input-wrapper">
                 <input
                   className="ocr-result-input"
@@ -469,207 +489,163 @@ function RegisterCattleModal({
                 />
 
                 {ocrStatus === "loading" && (
-                  <span className="ocr-status-badge loading">
-                    분석 중
-                  </span>
+                  <span className="ocr-status-badge loading">분석 중</span>
                 )}
 
                 {ocrStatus === "success" && (
-                  <span className="ocr-status-badge success">
-                    자동 인식
-                  </span>
+                  <span className="ocr-status-badge success">자동 인식</span>
                 )}
 
                 {ocrStatus === "error" && (
-                  <span className="ocr-status-badge error">
-                    직접 입력
-                  </span>
+                  <span className="ocr-status-badge error">직접 입력</span>
                 )}
               </div>
 
               {ocrMessage && (
-                <span
-                  className={`ocr-message ${ocrStatus}`}
-                >
-                  {ocrMessage}
-                </span>
+                <span className={`ocr-message ${ocrStatus}`}>{ocrMessage}</span>
               )}
             </label>
           )}
 
           <label className="image-upload-field">
             비문 사진
-
             <span className="upload-description">
-              코가 화면에 가득 차도록 30cm 거리에서 정면 촬영해 주세요. 얼굴이나 전신이 나오면 인식되지 않습니다. 각도를 바꿔 3장 이상 선택해 주세요.
+              코가 화면에 가득 차도록 30cm 거리에서 정면 촬영해 주세요. 얼굴이나
+              전신이 나오면 인식되지 않습니다. 각도를 바꿔 3장 이상 선택하면
+              정확도가 올라갑니다.
             </span>
 
             <input
               type="file"
-              accept="image/jpeg,image/png,image/webp"
               name="muzzle_files"
+              accept="image/*"
               multiple
-              onChange={(event) => {
-                setMuzzleImage(event.target.files?.[0] ?? null);
-              }}
-              required
+              onChange={handleMuzzleFilesChange}
             />
 
-            {muzzleImage && (
-              <span className="selected-file">
-                선택됨: {muzzleImage.name}
-              </span>
+            {muzzleFiles.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                <b>{muzzleFiles.length}장 선택됨</b>
+                {muzzleFiles.length < 3 && (
+                  <span style={{ color: "#b45309", marginLeft: 8 }}>
+                    각도를 바꿔 3장 이상 넣으면 정확도가 올라갑니다
+                  </span>
+                )}
+
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    marginTop: 6,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {muzzlePreviews.map((url, index) => (
+                    <img
+                      key={url}
+                      src={url}
+                      alt={`비문 사진 ${index + 1}`}
+                      style={{
+                        width: 72,
+                        height: 72,
+                        objectFit: "cover",
+                        borderRadius: 6,
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
           </label>
 
-          {errorMessage && (
-            <p className="error-message">{errorMessage}</p>
+          {enrollResult?.status === "success" && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid #16a34a",
+                background: "#f0fdf4",
+                color: "#14532d",
+                fontSize: 14,
+              }}
+            >
+              <b>비문 등록 완료</b>
+              <div style={{ marginTop: 6, lineHeight: 1.7 }}>
+                개체번호 {enrollData?.national_id ?? "-"}
+                <br />
+                내부 ID {enrollData?.cattle_id ?? "-"}
+                <br />
+                사용한 사진 {enrollData?.images_used ?? muzzleFiles.length}장
+                <br />
+                사진 일치도{" "}
+                {consistency === null
+                  ? "측정값 없음"
+                  : `${consistency.toFixed(4)} (기준 ${MUZZLE_CONSISTENCY_THRESHOLD} 이상)`}
+              </div>
+
+              {muzzlePreviews.length > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 6,
+                    marginTop: 8,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {muzzlePreviews.map((url, index) => (
+                    <img
+                      key={`enrolled-${url}`}
+                      src={url}
+                      alt={`등록된 비문 사진 ${index + 1}`}
+                      style={{
+                        width: 56,
+                        height: 56,
+                        objectFit: "cover",
+                        borderRadius: 6,
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
           )}
+
+          {(enrollResult?.status === "inconsistent" ||
+            enrollResult?.status === "error") && (
+            <div
+              style={{
+                marginTop: 12,
+                padding: 12,
+                borderRadius: 8,
+                border: "1px solid #dc2626",
+                background: "#fef2f2",
+                color: "#7f1d1d",
+                fontSize: 14,
+                lineHeight: 1.7,
+              }}
+            >
+              <b>
+                {enrollResult.status === "inconsistent"
+                  ? "사진이 서로 다른 개체로 판정됐습니다"
+                  : "비문 등록에 실패했습니다"}
+              </b>
+              <div style={{ marginTop: 6 }}>{enrollResult.message}</div>
+            </div>
+          )}
+
+          {errorMessage && <p className="error-message">{errorMessage}</p>}
 
           <button
             className="register-submit-button"
             type="submit"
-            disabled={
-              isSubmitting || ocrStatus === "loading"
-            }
+            disabled={isSubmitting || ocrStatus === "loading"}
           >
             {isSubmitting ? "등록 중..." : "등록하기"}
           </button>
         </form>
       </section>
     </div>
-  );
-}
-
-function AnomalyDashboard({ demoResult }) {
-  const [anomalies, setAnomalies] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [errorMessage, setErrorMessage] = useState("");
-
-  const loadAnomalies = useCallback(async () => {
-    setIsLoading(true);
-    setErrorMessage("");
-
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/anomalies/active`,
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.detail ?? "이상 개체 조회에 실패했습니다.",
-        );
-      }
-
-      setAnomalies(result.data ?? []);
-    } catch (error) {
-      console.error("Active anomaly fetch error:", error);
-      setErrorMessage(error.message);
-      setAnomalies([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadAnomalies();
-  }, [loadAnomalies]);
-
-  return (
-    <section className="anomaly-section">
-      <div className="anomaly-section-header">
-        <div>
-          <p className="section-label">실시간 위험 현황</p>
-          <h2>이상 개체 대시보드</h2>
-        </div>
-
-        <button
-          className="refresh-button"
-          type="button"
-          onClick={loadAnomalies}
-          disabled={isLoading}
-        >
-          {isLoading ? "조회 중..." : "새로고침"}
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="dashboard-empty">
-          이상 개체 정보를 불러오는 중입니다.
-        </div>
-      )}
-
-      {!isLoading && errorMessage && (
-        <div className="dashboard-error">
-          <strong>DB 조회에 실패했습니다.</strong>
-          <p>{errorMessage}</p>
-        </div>
-      )}
-
-      {!isLoading &&
-        !errorMessage &&
-        anomalies.length === 0 && (
-          <div className="dashboard-empty">
-            <span className="normal-icon">✓</span>
-            <strong>현재 이상이 감지된 소가 없습니다.</strong>
-            <p>모든 개체가 정상 상태입니다.</p>
-          </div>
-        )}
-
-      {!isLoading && anomalies.length > 0 && (
-        <div className="anomaly-list">
-          {anomalies.map((item) => (
-            <article
-              className="anomaly-card"
-              key={item.anomaly_id}
-            >
-              <div className="anomaly-card-top">
-                <div>
-                  <span className="danger-badge">이상 감지</span>
-
-                  <h3>
-                    {item.ear_tag_number ??
-                      `개체 ${item.cattle_id}`}
-                  </h3>
-                </div>
-
-                <span className="anomaly-time">
-                  {item.detected_at
-                    ? new Date(
-                        item.detected_at,
-                      ).toLocaleString("ko-KR")
-                    : "시간 정보 없음"}
-                </span>
-              </div>
-
-              <dl className="anomaly-details">
-                <div>
-                  <dt>귀표 번호</dt>
-                  <dd>{item.ear_tag_number ?? "-"}</dd>
-                </div>
-
-                <div>
-                  <dt>이상 행동</dt>
-                  <dd>{item.anomaly_type ?? "-"}</dd>
-                </div>
-
-                <div>
-                  <dt>위험도</dt>
-                  <dd>{item.severity ?? "-"}</dd>
-                </div>
-
-                <div>
-                  <dt>상태</dt>
-                  <dd>{item.status ?? "active"}</dd>
-                </div>
-              </dl>
-            </article>
-          ))}
-        </div>
-      )}
-    </section>
   );
 }
 
@@ -690,10 +666,7 @@ function DashboardPage({ user, setUser }) {
   const handleLogout = async () => {
     if (user.loginType === "google") {
       try {
-        if (
-          typeof window.COWOW_ANDROID?.googleLogout ===
-          "function"
-        ) {
+        if (typeof window.COWOW_ANDROID?.googleLogout === "function") {
           window.COWOW_ANDROID.googleLogout();
         } else {
           googleLogout();
@@ -730,7 +703,6 @@ function DashboardPage({ user, setUser }) {
         </button>
 
         <div className="header-actions header-actions-right">
-
           <div className="profile-menu-wrapper">
             <button
               className="header-user profile-menu-button"
@@ -763,10 +735,7 @@ function DashboardPage({ user, setUser }) {
 
             {isProfileMenuOpen && (
               <div className="profile-dropdown">
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                >
+                <button type="button" onClick={handleLogout}>
                   로그아웃
                 </button>
               </div>
@@ -774,13 +743,10 @@ function DashboardPage({ user, setUser }) {
           </div>
         </div>
       </header>
-{location.pathname === "/dashboard" && (
-        <AbnormalCattleDashboard />
-      )}
 
-      {location.pathname === "/inference" && (
-        <DemoVideoSelector />
-      )}
+      {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
+
+      {location.pathname === "/inference" && <DemoVideoSelector />}
 
       {location.pathname === "/cattle/register" && (
         <RegisterCattleModal
@@ -795,16 +761,11 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/chat" && <RagChatbot />}
 
-      {location.pathname === "/control" && (
-        <BarnEnvironmentControl />
-      )}
+      {location.pathname === "/control" && <BarnEnvironmentControl />}
 
-      {location.pathname === "/devices/setup" && (
-        <DeviceSetupPage user={user} />
-      )}
+      {location.pathname === "/devices/setup" && <DeviceSetupPage user={user} />}
 
       <BottomNavigation />
-
     </main>
   );
 }
@@ -850,118 +811,50 @@ function App() {
     <Routes>
       <Route
         path="/"
-        element={
-          <Navigate
-            to={user ? "/dashboard" : "/login"}
-            replace
-          />
-        }
+        element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
 
       <Route
         path="/login"
-        element={
-          <LoginPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<LoginPage user={user} setUser={setUser} />}
       />
 
       <Route
         path="/dashboard"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
-
 
       <Route
         path="/inference"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
 
       <Route
         path="/cattle/register"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
+
       <Route
         path="/chat"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
+
       <Route
         path="/control"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
+
       <Route
         path="/devices/setup"
-        element={
-          <DashboardPage
-            user={user}
-            setUser={setUser}
-          />
-        }
+        element={<DashboardPage user={user} setUser={setUser} />}
       />
+
       <Route
         path="*"
-        element={
-          <Navigate
-            to={user ? "/dashboard" : "/login"}
-            replace
-          />
-        }
+        element={<Navigate to={user ? "/dashboard" : "/login"} replace />}
       />
     </Routes>
   );
 }
 
 export default App;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
