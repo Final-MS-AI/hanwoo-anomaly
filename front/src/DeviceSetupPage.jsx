@@ -40,10 +40,24 @@ function DeviceSetupPage({ user }) {
   };
 
   const sendClaimCode = async () => {
+    if (!deviceNumber.trim()) {
+      setMessageType("error");
+      setMessage("장비 번호를 입력해 주세요.");
+      return;
+    }
+
+    if (!user?.email) {
+      setMessageType("error");
+      setMessage("로그인 계정의 이메일 정보를 확인할 수 없습니다. 다시 로그인해 주세요.");
+      return;
+    }
+
     if (!validateDeviceNumber()) return;
 
     setIsSendingCode(true);
     setMessage("");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 15000);
 
     try {
       const response = await fetch(
@@ -51,6 +65,7 @@ function DeviceSetupPage({ user }) {
         {
           method: "POST",
           credentials: "include",
+          signal: controller.signal,
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ deviceId: normalizedDeviceNumber }),
         },
@@ -70,8 +85,13 @@ function DeviceSetupPage({ user }) {
       );
     } catch (error) {
       setMessageType("error");
-      setMessage(error.message);
+      setMessage(
+        error.name === "AbortError"
+          ? "서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해 주세요."
+          : error.message,
+      );
     } finally {
+      window.clearTimeout(timeoutId);
       setIsSendingCode(false);
     }
   };
@@ -297,7 +317,7 @@ function DeviceSetupPage({ user }) {
             <button
               type="button"
               className="device-send-code-button"
-              disabled={isSendingCode || !user?.email || !deviceNumber.trim()}
+              disabled={isSendingCode}
               onClick={sendClaimCode}
             >
               {isSendingCode ? "발송 중..." : "등록 코드 받기"}
