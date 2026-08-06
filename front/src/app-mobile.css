@@ -578,6 +578,27 @@
 .device-sharing-message { margin: 0; color: #347648; font-size: 11px; }
 .device-sharing-message.error { color: #a13f35; }
 
+.device-sharing-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #a13f35;
+  font-size: 11px;
+}
+
+.device-sharing-unavailable button {
+  min-height: 34px;
+  padding: 0 12px;
+  color: #326f43;
+  background: #fff;
+  border: 1px solid #8fb49a;
+  border-radius: 9px;
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .sensor-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

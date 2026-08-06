@@ -22,6 +22,10 @@ function DeviceSharingPanel({ device }) {
       const response = await fetch(`${API_BASE_URL}/devices/sharing`, {
         credentials: "include",
       });
+      const contentType = response.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("공유 API가 서버에 연결되지 않았습니다. 서버 설정을 확인해 주세요.");
+      }
       const data = await response.json();
 
       if (!response.ok) {
@@ -30,6 +34,7 @@ function DeviceSharingPanel({ device }) {
 
       setSharing(data);
     } catch (error) {
+      setSharing(null);
       setMessageType("error");
       setMessage(error.message);
     } finally {
@@ -140,7 +145,7 @@ function DeviceSharingPanel({ device }) {
         <div className="device-sharing-content">
           {isLoading && !sharing ? (
             <p className="device-sharing-loading">공유 정보를 불러오는 중...</p>
-          ) : (
+          ) : sharing ? (
             <>
               <div className="device-sharing-role">
                 <span>현재 권한</span>
@@ -205,6 +210,11 @@ function DeviceSharingPanel({ device }) {
                 )}
               </div>
             </>
+          ) : (
+            <div className="device-sharing-unavailable">
+              <strong>공유 정보를 불러오지 못했습니다.</strong>
+              <button type="button" onClick={loadSharing}>다시 불러오기</button>
+            </div>
           )}
 
           {message && (
