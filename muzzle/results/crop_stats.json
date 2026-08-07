@@ -1,0 +1,122 @@
+{
+  "cow01_enroll": {
+    "split": "enroll",
+    "cow": "cow01",
+    "kept": 8,
+    "matched": 73,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.736
+  },
+  "cow06_enroll": {
+    "split": "enroll",
+    "cow": "cow06",
+    "kept": 8,
+    "matched": 52,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.81
+  },
+  "cow07_enroll": {
+    "split": "enroll",
+    "cow": "cow07",
+    "kept": 8,
+    "matched": 52,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.898
+  },
+  "cow09_enroll": {
+    "split": "enroll",
+    "cow": "cow09",
+    "kept": 8,
+    "matched": 73,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.849
+  },
+  "cow10_enroll": {
+    "split": "enroll",
+    "cow": "cow10",
+    "kept": 8,
+    "matched": 64,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.711
+  },
+  "cow01_q1": {
+    "split": "query",
+    "cow": "cow01",
+    "kept": 6,
+    "matched": 61,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.549
+  },
+  "cow01_q2": {
+    "split": "query",
+    "cow": "cow01",
+    "kept": 6,
+    "matched": 61,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.771
+  },
+  "cow06_q1": {
+    "split": "query",
+    "cow": "cow06",
+    "kept": 6,
+    "matched": 49,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.805
+  },
+  "cow07_q1": {
+    "split": "query",
+    "cow": "cow07",
+    "kept": 6,
+    "matched": 49,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.745
+  },
+  "cow10_q1": {
+    "split": "query",
+    "cow": "cow10",
+    "kept": 6,
+    "matched": 60,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.683
+  },
+  "cow02": {
+    "split": "unknown",
+    "cow": "cow02",
+    "kept": 6,
+    "matched": 86,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.464
+  },
+  "cow03": {
+    "split": "unknown",
+    "cow": "cow03",
+    "kept": 6,
+    "matched": 70,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.667
+  },
+  "cow04": {
+    "split": "unknown",
+    "cow": "cow04",
+    "kept": 6,
+    "matched": 61,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.861
+  },
+  "cow05": {
+    "split": "unknown",
+    "cow": "cow05",
+    "kept": 6,
+    "matched": 98,
+    "dropped_lowmatch": 0,
+    "mean_match": 0.863
+  },
+  "cow08": {
+    "split": "unknown",
+    "cow": "cow08",
+    "kept": 6,
+    "matched": 74,
+    "dropped_lowmatch": 3,
+    "mean_match": 0.505
+  }
+}

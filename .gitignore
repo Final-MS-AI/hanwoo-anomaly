@@ -17,3 +17,6 @@ front/.env.*.local
 *.backup
 *.before-*
 *.bak
+data/
+*.mp4
+crops/
