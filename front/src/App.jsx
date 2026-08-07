@@ -235,6 +235,7 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
 
   const [earTagImage, setEarTagImage] = useState(null);
   const [earTagNumber, setEarTagNumber] = useState("");
+  const [ocrResult, setOcrResult] = useState(null);
   const [ocrStatus, setOcrStatus] = useState("idle");
   const [ocrMessage, setOcrMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -266,6 +267,7 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
 
     setEarTagImage(file);
     setEarTagNumber("");
+    setOcrResult(null);
     setOcrMessage("");
     setErrorMessage("");
 
@@ -292,6 +294,7 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
       }
 
       setEarTagNumber(result.ear_tag_number ?? "");
+      setOcrResult(result);
       setOcrStatus("success");
       setOcrMessage("사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.");
     } catch (error) {
@@ -503,6 +506,85 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
 
               {ocrMessage && (
                 <span className={`ocr-message ${ocrStatus}`}>{ocrMessage}</span>
+              )}
+
+              {ocrResult?.ocr_log_id && (
+                <section className="ocr-visualization">
+                  <div className="ocr-visualization-header">
+                    <strong>AI 귀표 분석 과정</strong>
+                    <span>
+                      객체 탐지 후 OCR로 귀표 번호를 판독합니다.
+                    </span>
+                  </div>
+
+                  <div className="ocr-visualization-grid">
+                    <article className="ocr-visualization-card">
+                      <div className="ocr-step-label">
+                        1. YOLO 귀표 위치 탐지
+                      </div>
+
+                      <img
+                        className="ocr-visualization-image"
+                        src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/annotated`}
+                        alt="YOLO가 귀표 위치를 탐지한 결과"
+                      />
+
+                      <span className="ocr-visualization-caption">
+                        AI가 이미지에서 귀표 위치를 Bounding Box로 탐지합니다.
+                      </span>
+                    </article>
+
+                    <article className="ocr-visualization-card">
+                      <div className="ocr-step-label">
+                        2. OCR 분석 영역
+                      </div>
+
+                      <img
+                        className="ocr-visualization-image crop"
+                        src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/evidence`}
+                        alt="OCR에 사용된 귀표 영역"
+                      />
+
+                      <span className="ocr-visualization-caption">
+                        탐지한 귀표 영역만 잘라 OCR 판독에 사용합니다.
+                      </span>
+                    </article>
+                  </div>
+
+                  <div className="ocr-visualization-result">
+                    <div>
+                      <span>판독 귀표번호</span>
+                      <strong>
+                        {ocrResult.ear_tag_number ?? "-"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>OCR 신뢰도</span>
+                      <strong>
+                        {Math.round(
+                          (ocrResult.confidence ?? 0) * 1000
+                        ) / 10}%
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>등록 개체</span>
+                      <strong>
+                        {ocrResult.registered ? "확인됨" : "미등록"}
+                      </strong>
+                    </div>
+
+                    <div>
+                      <span>판독 상태</span>
+                      <strong>
+                        {ocrResult.requires_human_confirmation
+                          ? "사용자 확인 필요"
+                          : "확인 완료"}
+                      </strong>
+                    </div>
+                  </div>
+                </section>
               )}
             </label>
           )}
