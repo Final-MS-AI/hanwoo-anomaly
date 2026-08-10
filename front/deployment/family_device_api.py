@@ -4,6 +4,7 @@ import smtplib
 from email.message import EmailMessage
 
 import psycopg
+from psycopg.types.json import Jsonb
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel, Field
 
@@ -352,7 +353,10 @@ def actuator(body: ActuatorRequest, cowow_session: str | None = Cookie(default=N
         require_access(connection, user, body.deviceId)
         with connection.cursor() as cursor:
             cursor.execute("UPDATE device_commands SET status='superseded' WHERE device_id=%s AND actuator=%s AND status='pending'", (body.deviceId, body.actuator))
-            cursor.execute("INSERT INTO device_commands(device_id,user_id,actuator,command_value,status) VALUES(%s,%s,%s,%s,'pending') RETURNING id", (body.deviceId, user["id"], body.actuator, int(body.value)))
+            cursor.execute(
+                "INSERT INTO device_commands(device_id,user_id,actuator,command_value,status) VALUES(%s,%s,%s,%s,'pending') RETURNING id",
+                (body.deviceId, user["id"], body.actuator, Jsonb(int(body.value))),
+            )
             command_id = cursor.fetchone()[0]
         connection.commit()
     return {"commandId": command_id, "status": "pending"}
