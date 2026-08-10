@@ -295,8 +295,38 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
 
       setEarTagNumber(result.ear_tag_number ?? "");
       setOcrResult(result);
-      setOcrStatus("success");
-      setOcrMessage("사진에서 인식한 값입니다. 틀린 경우 직접 수정해 주세요.");
+
+      if (result.success) {
+        setOcrStatus("success");
+        setOcrMessage(
+          "사진에서 귀표 번호를 정상적으로 인식했습니다. 결과를 확인해 주세요."
+        );
+      } else if (result.reason === "single_image_unconfirmed") {
+        setOcrStatus("warning");
+        setOcrMessage(
+          "귀표 번호를 인식했지만 정확한 등록을 위해 사용자 확인이 필요합니다."
+        );
+      } else if (result.reason === "ear_tag_not_detected") {
+        setOcrStatus("error");
+        setOcrMessage(
+          "사진에서 귀표를 찾지 못했습니다. 귀표가 화면에 크게 보이도록 다시 촬영해 주세요."
+        );
+      } else if (result.reason === "crop_quality_rejected") {
+        setOcrStatus("error");
+        setOcrMessage(
+          "귀표는 감지했지만 이미지 품질이 낮아 번호를 판독하지 못했습니다. 흔들림, 거리, 빛 반사를 확인한 뒤 다시 촬영해 주세요."
+        );
+      } else if (result.reason === "ear_tag_number_not_found") {
+        setOcrStatus("error");
+        setOcrMessage(
+          "귀표는 감지했지만 번호를 읽지 못했습니다. 더 선명한 사진으로 다시 시도하거나 귀표 번호를 직접 입력해 주세요."
+        );
+      } else {
+        setOcrStatus("error");
+        setOcrMessage(
+          "귀표 번호를 자동으로 판독하지 못했습니다. 다른 사진으로 다시 시도하거나 직접 입력해 주세요."
+        );
+      }
     } catch (error) {
       console.error("Ear tag OCR error:", error);
       setOcrStatus("error");
@@ -499,6 +529,10 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
                   <span className="ocr-status-badge success">자동 인식</span>
                 )}
 
+                {ocrStatus === "warning" && (
+                  <span className="ocr-status-badge warning">확인 필요</span>
+                )}
+
                 {ocrStatus === "error" && (
                   <span className="ocr-status-badge error">직접 입력</span>
                 )}
@@ -508,8 +542,40 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
                 <span className={`ocr-message ${ocrStatus}`}>{ocrMessage}</span>
               )}
 
-              {ocrResult?.ocr_log_id && (
-                <section className="ocr-visualization">
+              {ocrResult &&
+                ocrStatus === "error" &&
+                [
+                  "ear_tag_not_detected",
+                  "crop_quality_rejected",
+                  "ear_tag_number_not_found",
+                ].includes(ocrResult.reason) && (
+                  <section className="ocr-failure-panel">
+                    <strong className="ocr-failure-title">
+                      {ocrResult.reason === "ear_tag_not_detected"
+                        ? "귀표를 찾지 못했습니다."
+                        : ocrResult.reason === "crop_quality_rejected"
+                          ? "귀표 이미지 품질이 부족합니다."
+                          : "귀표 번호를 읽지 못했습니다."}
+                    </strong>
+
+                    <span className="ocr-failure-description">
+                      {ocrResult.reason === "ear_tag_not_detected"
+                        ? "귀표가 화면 중앙에 크고 선명하게 보이도록 다시 촬영해 주세요."
+                        : ocrResult.reason === "crop_quality_rejected"
+                          ? "사진의 흔들림, 촬영 거리, 빛 반사를 확인한 뒤 다시 촬영해 주세요."
+                          : "귀표 번호가 선명하게 보이는 다른 사진으로 다시 시도하거나 번호를 직접 입력해 주세요."}
+                    </span>
+
+                    <span className="ocr-failure-help">
+                      다른 사진을 선택하면 AI 분석을 다시 실행합니다.
+                    </span>
+                  </section>
+                )}
+
+              {ocrResult?.ocr_log_id &&
+                (ocrResult.success ||
+                  ocrResult.reason === "single_image_unconfirmed") && (
+                  <section className="ocr-visualization">
                   <div className="ocr-visualization-header">
                     <strong>AI 귀표 분석 과정</strong>
                     <span>
@@ -827,7 +893,6 @@ function DashboardPage({ user, setUser }) {
       </header>
 
       {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
-
       {location.pathname === "/inference" && <DemoVideoSelector />}
 
       {location.pathname === "/cattle/register" && (

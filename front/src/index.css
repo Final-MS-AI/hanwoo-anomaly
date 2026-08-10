@@ -1659,3 +1659,50 @@ h1 {
   }
 }
 
+
+/* =========================================================
+   Ear Tag OCR Failure / Warning Flow
+   ========================================================= */
+
+.ocr-status-badge.warning {
+  color: #8a5a00;
+  background: #fff4cc;
+  border: 1px solid #e8c96b;
+}
+
+.ocr-message.warning {
+  color: #7a5600;
+}
+
+.ocr-message.error {
+  color: #a33a2b;
+}
+
+.ocr-failure-panel {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 14px 16px;
+  background: #fff7f5;
+  border: 1px solid #e5b9b0;
+  border-left: 4px solid #c65b49;
+  border-radius: 10px;
+}
+
+.ocr-failure-title {
+  color: #9f382b;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ocr-failure-description {
+  color: #684f47;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.ocr-failure-help {
+  color: #8a756d;
+  font-size: 12px;
+  line-height: 1.5;
+}
