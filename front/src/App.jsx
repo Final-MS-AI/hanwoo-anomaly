@@ -142,13 +142,13 @@ function LoginPage({ user, setUser }) {
         <div className="login-brand">
           <img
             className="login-cowow-logo"
-            src="/cowow-logo.png"
+            src="/cowow-logo.png?v=20260811-1"
             alt="COWOW"
           />
 
           <img
             className="login-bull-image"
-            src="/cowow-bull.png"
+            src="/cowow-bull.png?v=20260811-1"
             alt="COWOW 황소 캐릭터"
           />
         </div>
@@ -192,7 +192,7 @@ function LoginPage({ user, setUser }) {
             }}
             aria-label="카카오 로그인"
           >
-            <img src="/kakao-login.png" alt="카카오 로그인" />
+            <img src="/kakao-login.png?v=20260811-1" alt="카카오 로그인" />
           </button>
 
           <button
@@ -779,7 +779,7 @@ function DashboardPage({ user, setUser }) {
         >
           <img
             className="dashboard-cowow-logo"
-            src="/cowow-logo.png"
+            src="/cowow-logo.png?v=20260811-1"
             alt="COWOW"
           />
         </button>
