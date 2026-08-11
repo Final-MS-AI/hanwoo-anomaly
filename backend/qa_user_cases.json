@@ -1,0 +1,152 @@
+[
+  {
+    "id": "qa-001",
+    "question": "소에서 구제역이 의심되면 가장 먼저 무엇을 해야 하나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-002",
+    "question": "구제역 신고는 어디에 해야 하나요?",
+    "mode": "short"
+  },
+  {
+    "id": "qa-003",
+    "question": "구제역 신고 전화번호를 알려주세요.",
+    "mode": "short"
+  },
+  {
+    "id": "qa-004",
+    "question": "구제역 의심축을 발견한 뒤 농장을 떠나도 되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-005",
+    "question": "구제역 신고 후 차량이 농장에 들어와도 되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-006",
+    "question": "신고한 다음 가축을 다른 축사로 옮겨도 되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-007",
+    "question": "방역관이 올 때까지 무엇을 해야 하나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-008",
+    "question": "가족이나 직원이 농장에 들어와도 되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-009",
+    "question": "구제역 의심 농장에서 분뇨나 장비를 밖으로 반출해도 되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-010",
+    "question": "구제역 의심 신고 이후 현장 대응 절차를 전체적으로 설명해 주세요.",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-011",
+    "question": "구제역의 대표적인 임상증상은 무엇인가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-012",
+    "question": "소가 구제역에 걸렸을 때 입과 발굽에는 어떤 증상이 나타나나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-013",
+    "question": "구제역 바이러스는 어떻게 전파되나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-014",
+    "question": "구제역 잠복기는 어느 정도인가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-015",
+    "question": "구제역에 감염되기 쉬운 동물은 무엇인가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-016",
+    "question": "가축전염병 예방법상 구제역 의심축 신고 의무자는 누구인가요?",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-017",
+    "question": "가축전염병 예방법 제11조의 주요 내용을 설명해 주세요.",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-018",
+    "question": "수의사도 구제역 신고 의무가 있나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-019",
+    "question": "동물약품이나 사료 판매자도 신고해야 하나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-020",
+    "question": "가축운송업자는 어떤 경우 신고 의무가 있나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-021",
+    "question": "축사시설현대화 지원사업은 누가 신청할 수 있나요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-022",
+    "question": "축사시설현대화 지원사업에서 제외되는 대상은 누구인가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-023",
+    "question": "축사시설현대화 지원사업의 지원 대상과 제외 대상을 같이 정리해 주세요.",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-024",
+    "question": "축사시설현대화 사업의 지원 조건을 알려주세요.",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-025",
+    "question": "축사시설현대화 지원사업의 주요 예외 조건은 무엇인가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-026",
+    "question": "구제역 발생 농장의 차량 이동 내역은 왜 역학조사에서 중요한가요?",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-027",
+    "question": "구제역 발생 원인과 전파 경로를 어떻게 분석하나요?",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-028",
+    "question": "구제역 발생 시 역학조사와 현장 방역조치를 함께 설명해 주세요.",
+    "mode": "detailed"
+  },
+  {
+    "id": "qa-029",
+    "question": "파이썬 리스트를 정렬하는 방법을 알려주세요.",
+    "mode": "normal"
+  },
+  {
+    "id": "qa-030",
+    "question": "오늘 서울 날씨는 어떤가요?",
+    "mode": "normal"
+  }
+]

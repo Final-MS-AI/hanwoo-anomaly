@@ -1,0 +1,102 @@
+[
+  {
+    "id": "neg-001",
+    "question": "농장 직원 교육 방법을 알려주세요.",
+    "expected_route": "global"
+  },
+  {
+    "id": "neg-002",
+    "question": "사료 판매자의 일반적인 역할은 무엇인가요?",
+    "expected_route": "global"
+  },
+  {
+    "id": "neg-003",
+    "question": "차량 이동 내역을 CSV 파일로 정리하는 방법을 알려주세요.",
+    "expected_route": "global"
+  },
+  {
+    "id": "neg-004",
+    "question": "장비 반출 목록을 엑셀로 만드는 방법을 알려주세요.",
+    "expected_route": "global"
+  },
+  {
+    "id": "neg-005",
+    "question": "가족과 직원의 근무 일정을 어떻게 관리하면 좋을까요?",
+    "expected_route": "global"
+  },
+  {
+    "id": "neg-006",
+    "question": "구제역 백신의 효과는 어떤가요?",
+    "expected_route": "disease_info"
+  },
+  {
+    "id": "neg-007",
+    "question": "구제역 바이러스의 특징을 알려주세요.",
+    "expected_route": "disease_info"
+  },
+  {
+    "id": "neg-008",
+    "question": "구제역 검사 방법에는 어떤 것이 있나요?",
+    "expected_route": "disease_info"
+  },
+  {
+    "id": "neg-009",
+    "question": "구제역 발생 농장의 역학관계를 분석해 주세요.",
+    "expected_route": "outbreak_analysis"
+  },
+  {
+    "id": "neg-010",
+    "question": "구제역 발생 농장의 차량 이동 내역은 역학적으로 어떤 의미가 있나요?",
+    "expected_route": "outbreak_analysis"
+  },
+  {
+    "id": "neg-011",
+    "question": "구제역 신고 후 차량 출입은 어떻게 통제해야 하나요?",
+    "expected_route": "field_action"
+  },
+  {
+    "id": "neg-012",
+    "question": "구제역 의심 상황에서 분뇨 반출은 어떻게 해야 하나요?",
+    "expected_route": "field_action"
+  },
+  {
+    "id": "neg-013",
+    "question": "구제역 의심축을 발견한 뒤 어떤 현장 조치를 해야 하나요?",
+    "expected_route": "field_action"
+  },
+  {
+    "id": "neg-014",
+    "question": "가축전염병 예방법상 신고 의무자는 누구인가요?",
+    "expected_route": "legal"
+  },
+  {
+    "id": "neg-015",
+    "question": "가축전염병 신고 의무가 있는 수의사는 누구인가요?",
+    "expected_route": "legal"
+  },
+  {
+    "id": "neg-016",
+    "question": "축사시설현대화 지원사업의 지원 조건을 알려주세요.",
+    "expected_route": "support_program"
+  },
+  {
+    "id": "neg-017",
+    "question": "축사시설현대화 지원사업에서 제외되는 대상은 누구인가요?",
+    "expected_route": "support_program"
+  },
+  {
+    "id": "neg-018",
+    "question": "축사시설현대화 지원사업의 법적 기준은 무엇인가요?",
+    "expected_route": "composite_support_legal"
+  },
+  {
+    "id": "neg-019",
+    "question": "구제역 발생 원인과 현장 방역조치를 함께 설명해 주세요.",
+    "expected_route": "composite_outbreak_action"
+  },
+  {
+    "id": "neg-020",
+    "question": "구제역 백신 항체가 기준 미달일 때 현장에서 어떤 조치를 해야 하나요?",
+    "expected_route": "composite_vaccine"
+  }
+]
