@@ -1,0 +1,46 @@
+{
+  "version": "3.0.0",
+  "default_route": "global",
+  "routes": {
+    "field_action": {
+      "filter": "document_type eq 'sop' and review_required eq false",
+      "top_k": 10
+    },
+    "legal": {
+      "filter": "document_type eq 'law' and review_required eq false",
+      "top_k": 10
+    },
+    "disease_info": {
+      "filter": "(document_type eq 'qa_manual' or document_type eq 'epidemiology_report') and review_required eq false",
+      "top_k": 10
+    },
+    "outbreak_analysis": {
+      "filter": "document_type eq 'epidemiology_report' and review_required eq false",
+      "top_k": 10
+    },
+    "support_program": {
+      "filter": "document_type eq 'program_guideline' and review_required eq false",
+      "top_k": 10
+    },
+    "composite_legal_action": {
+      "filter": "(document_type eq 'sop' or document_type eq 'law') and review_required eq false",
+      "top_k": 12
+    },
+    "composite_outbreak_action": {
+      "filter": "(document_type eq 'epidemiology_report' or document_type eq 'sop') and review_required eq false",
+      "top_k": 12
+    },
+    "composite_vaccine": {
+      "filter": "(document_type eq 'qa_manual' or document_type eq 'sop') and review_required eq false",
+      "top_k": 12
+    },
+    "composite_support_legal": {
+      "filter": "(document_type eq 'program_guideline' or document_type eq 'law') and review_required eq false",
+      "top_k": 12
+    },
+    "global": {
+      "filter": "review_required eq false",
+      "top_k": 10
+    }
+  }
+}

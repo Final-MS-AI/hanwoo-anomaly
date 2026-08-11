@@ -20,3 +20,6 @@ front/.env.*.local
 data/
 *.mp4
 crops/
+
+# Backend local environment
+backend/.env
