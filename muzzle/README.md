@@ -25,7 +25,30 @@ cp .env.example .env      # DATABASE_URL 채울 것
 ./venv/bin/uvicorn main:app --host 0.0.0.0 --port 8001
 ```
 
-`encoder_onnx.py` 가 `../weights/muzzle_encoder.onnx` 를 참조한다. 경로가 다르면 수정할 것.
+가중치 경로는 환경변수로 지정한다. 미지정 시 `/home/azureuser/models/muzzle/weights/muzzle_encoder.onnx` 를 사용한다.
+
+```bash
+export MUZZLE_ONNX_PATH=/path/to/muzzle_encoder.onnx
+```
+
+> **주의 — 운영 중 가중치 파일을 이동하지 말 것.** `muzzle-api.service` 가 이 파일을 직접 읽는다. 다른 서버로 가져갈 때는 이동(`mv`)이 아니라 복사(`cp`)할 것.
+
+### 다른 서버로 이전할 때
+
+가중치만 옮길 수 없다. API 프로세스가 자기 디스크에서 파일을 읽으므로 서비스 전체가 함께 가야 한다.
+
+| # | 대상 | 비고 |
+|---|---|---|
+| 1 | `muzzle/api/` 코드 | 저장소에 있음 |
+| 2 | `muzzle/weights/muzzle_encoder.onnx` | 저장소에 있음 |
+| 3 | `.env` (`DATABASE_URL`) | 저장소에 없음. 직접 작성 |
+| 4 | venv | `pip install -r requirements.txt` 로 새로 생성 |
+| 5 | systemd 유닛 | `muzzle/deploy/muzzle-api.service` — 경로 수정 필요 |
+| 6 | Caddy 라우팅 | `127.0.0.1:8001` → 대상 서버 사설 IP |
+| 7 | Azure NSG | 서버 간 8001 포트 허용 |
+| 8 | PostgreSQL 방화벽 | 대상 서버 IP 를 `cow-db` 허용 목록에 추가 |
+
+6~8 이 누락되면 코드와 파일을 모두 옮겨도 서비스가 뜨지 않는다.
 
 ## 엔드포인트
 
