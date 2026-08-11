@@ -5,11 +5,16 @@ gray -> CLAHE(2.0, 8x8) -> 3채널 복제 -> Resize(255) -> CenterCrop(224)
 -> ToTensor -> ImageNet Normalize -> ONNX -> L2 정규화
 ★ 임의로 고치지 말 것. 학습 조건과 어긋나면 정확도가 무너진다.
 """
+import os
+
 import numpy as np, cv2, onnxruntime as ort
 from PIL import Image
 
-ONNX_PATH = "/home/azureuser/models/muzzle/weights/muzzle_encoder.onnx"
-IMG_SIZE = 224
+ONNX_PATH = os.getenv(
+    "MUZZLE_ONNX_PATH",
+    "/home/azureuser/models/muzzle/weights/muzzle_encoder.onnx",
+)
+IMG_SIZE = int(os.getenv("MUZZLE_IMG_SIZE", "224"))
 RESIZE = int(IMG_SIZE * 1.14)          # 255
 MEAN = np.array([0.485, 0.456, 0.406], np.float32)
 STD = np.array([0.229, 0.224, 0.225], np.float32)
