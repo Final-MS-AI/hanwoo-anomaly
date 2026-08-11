@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
 import requests
 
 
-API_URL = "http://127.0.0.1:8000/rag/chat"
+API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000/rag/chat")
 
 
 TEST_CASES: list[dict[str, Any]] = [
@@ -102,8 +103,8 @@ TEST_CASES: list[dict[str, Any]] = [
         "name": "문서 범위 밖 질문",
         "question": "오늘 서울 날씨는 어떤가요?",
         "required_any": [
-            "제공된 문서에서는 해당 내용을 확인할 수 없습니다",
-            "확인할 수 없습니다",
+            "일반적인 지식",
+            "일반적인 정보",
         ],
         "required_all": [],
         "forbidden": [

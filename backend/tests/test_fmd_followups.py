@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import os
 from typing import Any
 
 import pytest
 import requests
 
 
-API_URL = "http://127.0.0.1:8000/rag/chat"
+API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000/rag/chat")
 
 COMMON_MESSAGES = [
     {

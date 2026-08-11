@@ -269,6 +269,19 @@ def is_refusal_text(text: str) -> bool:
     )
 
 
+def is_document_scope_refusal(text: str) -> bool:
+    """관련성 휴리스틱을 통과했지만 모델이 문서 범위 밖이라고 판단한 응답."""
+    normalized = normalize_text(text)
+    return any(
+        pattern in normalized
+        for pattern in (
+            "제공된 문서에서는 해당 내용을 확인할 수 없습니다",
+            "제공된 검색 근거에서는 해당 내용을 확인할 수 없습니다",
+            "검색 근거에서 해당 내용을 확인할 수 없습니다",
+        )
+    )
+
+
 def content_fingerprint(text: str) -> set[str]:
     normalized = re.sub(r"[^0-9a-zA-Z가-힣 ]", " ", normalize_text(text))
     return {token for token in normalized.split() if len(token) >= 2}
@@ -369,6 +382,118 @@ def has_sufficient_relevance(
     overlap = query_tokens & context_tokens
 
     return bool(overlap)
+
+
+def has_strong_relevance(chunks: list[RetrievedChunk]) -> bool:
+    if not chunks or chunks[0].reranker_score is None:
+        return False
+    threshold = float(
+        os.getenv("RAG_STRONG_RERANKER_SCORE", "2.3")
+    )
+    return chunks[0].reranker_score >= threshold
+
+
+GENERAL_KNOWLEDGE_NOTICE = (
+    "주의: 아래 내용은 현재 등록된 문서에서 직접 확인된 내용이 아니라 "
+    "일반적인 지식을 바탕으로 설명합니다. 최종 판단이 필요한 경우 "
+    "관련 전문가나 담당 기관에 확인해 주세요."
+)
+
+LEGAL_GENERAL_NOTICE = (
+    "주의: 아래 내용은 현재 등록된 문서에서 직접 확인된 법적 근거가 "
+    "아닙니다. 일반적인 정보이며, 실제 적용 여부는 최신 법령이나 "
+    "담당 기관에 확인해 주세요."
+)
+
+ANIMAL_HEALTH_GENERAL_NOTICE = (
+    "주의: 아래 내용은 현재 등록된 문서에서 직접 확인된 내용이 아닌 "
+    "일반적인 정보이며 실제 진단이나 처치를 대신하지 않습니다. "
+    "증상이 있거나 이상이 의심되면 수의사의 확인이 필요합니다."
+)
+
+BIOSECURITY_GENERAL_NOTICE = (
+    "주의: 아래 내용은 현재 등록된 문서에서 직접 확인된 방역 지침이 "
+    "아닌 일반적인 정보입니다. 실제 방역 조치는 관할 방역기관 또는 "
+    "수의사의 지시를 우선해 주세요."
+)
+
+
+def is_legal_or_support_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    return any(
+        keyword in normalized
+        for keyword in (
+            "법률", "법령", "법적", "조문", "처벌", "벌칙", "과태료",
+            "지원 자격", "지원자격", "지원 대상", "지원대상", "신청 자격",
+            "행정 절차", "행정절차", "의무", "몇 조", "제도",
+        )
+    )
+
+
+def is_biosecurity_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    return any(
+        keyword in normalized
+        for keyword in (
+            "방역", "구제역", "가축전염병", "의심축", "살처분",
+            "이동 제한", "이동제한", "검역", "소독 조치",
+        )
+    )
+
+
+def is_animal_health_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    has_animal_context = any(
+        keyword in normalized
+        for keyword in (
+            "소", "한우", "송아지", "가축", "동물", "축우",
+        )
+    )
+    has_health_context = any(
+        keyword in normalized
+        for keyword in (
+            "건강", "증상", "질병", "아프", "스트레스", "식욕", "진단",
+            "치료", "처치", "행동", "호흡", "설사", "발열",
+        )
+    )
+    return has_animal_context and has_health_context
+
+
+def general_knowledge_notice(query: str) -> str:
+    if is_legal_or_support_question(query):
+        return LEGAL_GENERAL_NOTICE
+    if is_biosecurity_question(query):
+        return BIOSECURITY_GENERAL_NOTICE
+    if is_animal_health_question(query):
+        return ANIMAL_HEALTH_GENERAL_NOTICE
+    return GENERAL_KNOWLEDGE_NOTICE
+
+
+def should_allow_general_supplement(
+    query: str,
+    chunks: list[RetrievedChunk],
+) -> bool:
+    """복합 질문에서 문서로 뒷받침되지 않는 별도 요구가 있는지 보수적으로 본다."""
+    normalized = normalize_text(query)
+    compound_markers = (
+        "그리고", "또한", "추가로", "함께 알려", "도 알려",
+        "뿐만 아니라", "와 일반", "과 일반",
+    )
+    if not any(marker in normalized for marker in compound_markers):
+        return False
+
+    query_tokens = query_keywords(query)
+    if not query_tokens:
+        return False
+
+    context_tokens: set[str] = set()
+    for chunk in chunks[:3]:
+        context_tokens.update(content_fingerprint(chunk.content))
+        context_tokens.update(content_fingerprint(chunk.section_path))
+        context_tokens.update(content_fingerprint(chunk.document_title))
+
+    unsupported_tokens = query_tokens - context_tokens
+    return bool(query_tokens & context_tokens) and len(unsupported_tokens) >= 2
 
 def normalize_conversation(
     messages: list[dict[str, str]] | None,
@@ -842,10 +967,17 @@ def build_context(chunks: list[RetrievedChunk]) -> str:
 def system_prompt(
     mode: str,
     legal_subject: bool = False,
+    allow_general_supplement: bool = False,
 ) -> str:
     cfg = ANSWER_MODES[mode]
 
     length_instruction = cfg["instruction"]
+
+    if allow_general_supplement and mode == "detailed":
+        length_instruction = (
+            "절차, 조건, 예외를 구분해 충분히 설명한다. "
+            "검색 근거와 일반 지식 보완 영역을 명확히 분리한다."
+        )
 
     if legal_subject and mode == "short":
         length_instruction = (
@@ -855,16 +987,29 @@ def system_prompt(
             "선임 의무자와 선임되는 사람을 명확히 구분한다. "
             "답변 본문은 450자 이내로 작성한다."
         )
+    if allow_general_supplement:
+        knowledge_policy = """
+- 검색 근거로 확인되는 내용을 항상 먼저 답하고 해당 주장에만 인용 번호를 표시한다.
+- 질문의 일부가 검색 근거에 없을 때만 '추가 설명' 영역을 분리해 일반 지식으로 보완할 수 있다.
+- 일반 지식 영역에는 검색 근거 인용 번호를 표시하지 않는다.
+- 일반 지식 영역에는 등록 문서의 직접 근거가 아니라는 주의 문구를 반드시 포함한다.
+- 법령·지원 자격·금액·기간·방역 조치를 일반 지식으로 추정하거나 단정하지 않는다.
+""".strip()
+    else:
+        knowledge_policy = """
+- 반드시 제공된 검색 근거만 사용한다.
+- 검색 근거에 없는 내용을 일반지식으로 보충하거나 추측하지 않는다.
+- 검색 근거가 질문에 직접 답하지 못하면
+  "제공된 문서에서는 해당 내용을 확인할 수 없습니다."
+  라고 답한다.
+""".strip()
+
     return f"""
 당신은 축산 방역·법령·지원사업 문서를 기반으로 답변하는 질의응답 시스템이다.
 
 기본 원칙:
-- 반드시 제공된 검색 근거만 사용한다.
-- 검색 근거에 없는 내용을 일반지식으로 보충하거나 추측하지 않는다.
+{knowledge_policy}
 - 질문과 직접 관련되지 않은 문서를 이용해 억지로 답변하지 않는다.
-- 검색 근거가 질문에 직접 답하지 못하면
-  "제공된 문서에서는 해당 내용을 확인할 수 없습니다."
-  라고 답한다.
 - 질문이 구제역에 관한 것이 아닐 경우 구제역 신고나 이동 제한 내용을 임의로 답하지 않는다.
 - 질문이 법령, 지원사업, 이력관리, 방역, 질병 중 어느 영역인지 구분해 답한다.
 - 근거가 서로 충돌하면 충돌 사실을 명확히 밝힌다.
@@ -1615,6 +1760,7 @@ def request_answer_text(
     mode: str,
     input_text: str,
     legal_subject: bool = False,
+    allow_general_supplement: bool = False,
 ) -> str:
     response = response_client.responses.create(
         model=require_env(
@@ -1623,6 +1769,7 @@ def request_answer_text(
         instructions=system_prompt(
             mode,
             legal_subject=legal_subject,
+            allow_general_supplement=allow_general_supplement,
         ),
         input=input_text,
         reasoning={
@@ -1645,6 +1792,65 @@ def request_answer_text(
         )
 
     return answer
+
+
+def request_general_knowledge_answer(
+    response_client: OpenAI,
+    query: str,
+    mode: str,
+) -> GeneratedAnswer:
+    """RAG 검색을 먼저 수행한 뒤 근거가 부족할 때만 일반 지식으로 답한다."""
+    safety_instruction = general_knowledge_notice(query)
+    response = response_client.responses.create(
+        model=require_env("AZURE_OPENAI_CHAT_DEPLOYMENT"),
+        instructions=(
+            "사용자 질문에 일반적인 지식 범위에서 한국어 존댓말로 답하세요. "
+            "등록된 RAG 문서를 확인한 것처럼 표현하지 마세요. "
+            "[1], [2] 같은 인용 번호나 출처 목록을 만들지 마세요. "
+            "확실하지 않은 내용은 추정하지 말고 한계를 밝히세요. "
+            "법령 조항 번호, 벌칙, 지원 자격, 금액, 기간은 추정하지 마세요. "
+            "법률·행정 질문은 최신 법령 또는 담당 기관 확인을 안내하세요. "
+            "방역 질문은 관할 방역기관 또는 수의사의 지시를 우선하도록 안내하세요. "
+            "동물 건강 질문은 진단이나 처치를 단정하지 말고 수의사 확인을 안내하세요. "
+            f"답변에는 다음 안전 의미가 반드시 유지되어야 합니다: {safety_instruction}"
+        ),
+        input=f"현재 사용자의 질문:\n{query}",
+        reasoning={"effort": "minimal"},
+        max_output_tokens=ANSWER_MODES[mode]["max_output_tokens"],
+    )
+    answer = (response.output_text or "").strip()
+    if not answer:
+        raise RuntimeError(
+            "일반 지식 답변 모델이 빈 텍스트를 반환했습니다. "
+            f"status={response.status}, "
+            f"incomplete_details={response.incomplete_details}"
+        )
+
+    # 일반 지식에는 코드·URL 같은 표기가 포함될 수 있으므로 RAG 문서 전용
+    # 문장 정리 대신 가짜 출처와 인용만 제거한다.
+    answer = remove_generated_sources(answer)
+    answer = re.sub(r"\[\d+\]", "", answer)
+    answer = re.sub(r"[ \t]+\n", "\n", answer)
+    answer = re.sub(r"\n{3,}", "\n\n", answer).strip()
+
+    if safety_instruction not in answer:
+        answer = f"{safety_instruction}\n\n{answer}"
+
+    return GeneratedAnswer(text=answer.strip(), cited_chunks=[])
+
+
+def ensure_mixed_answer_notice(answer: str, query: str) -> str:
+    """혼합 답변의 일반 지식 영역에 deterministic 주의 문구를 넣는다."""
+    notice = general_knowledge_notice(query)
+    if notice in answer:
+        return answer
+
+    heading = re.search(r"(?m)^\s*추가\s*설명\s*:?\s*$", answer)
+    if heading:
+        insert_at = heading.end()
+        return f"{answer[:insert_at]}\n{notice}{answer[insert_at:]}"
+
+    return f"{answer.rstrip()}\n\n추가 설명:\n{notice}"
 
 FMD_REPORT_KEYWORDS = {
     "어디에 신고",
@@ -2431,9 +2637,10 @@ def generate_answer(
     search_query: str | None = None,
 ) -> GeneratedAnswer:
     if not chunks:
-        return GeneratedAnswer(
-            text="제공된 문서에서는 해당 내용을 확인할 수 없습니다.",
-            cited_chunks=[],
+        return request_general_knowledge_answer(
+            response_client=response_client,
+            query=query,
+            mode=mode,
         )
 
     relevance_query = search_query or query
@@ -2442,9 +2649,10 @@ def generate_answer(
         relevance_query,
         chunks,
     ):
-        return GeneratedAnswer(
-            text="제공된 문서에서는 해당 내용을 확인할 수 없습니다.",
-            cited_chunks=[],
+        return request_general_knowledge_answer(
+            response_client=response_client,
+            query=query,
+            mode=mode,
         )
     
     if is_legal_subject_question(query):
@@ -2589,23 +2797,68 @@ def generate_answer(
 
 
 
-    input_parts.append(
-        "이전 대화의 맥락을 유지하고 검색 근거에서 확인되는 내용만 답변하세요. "
-        "이전 답변에서 이미 안내한 내용은 반복하지 마세요. "
-        "현재 질문이 '그다음', '이후', '어떤 조치'처럼 후속 행동을 묻는 경우 "
-        "이전 단계 이후의 행동만 설명하세요."
+    legal_subject = is_legal_subject_question(query)
+    allow_general_supplement = should_allow_general_supplement(
+        query=query,
+        chunks=chunks,
     )
 
-    input_text = "\n\n".join(input_parts)
+    if allow_general_supplement:
+        input_parts.append(
+            "이전 대화에서 이미 안내한 내용은 반복하지 마세요. "
+            "질문의 일부만 검색 근거로 확인되는 복합 질문입니다. "
+            "답변을 '문서에서 확인된 내용'과 '추가 설명'으로 구분하세요. "
+            "문서에서 확인된 주장에만 [1], [2] 형식의 인용을 표시하세요. "
+            "추가 설명에는 RAG 인용을 붙이지 말고, 등록 문서의 직접 근거가 "
+            "아닌 일반 지식이라는 주의 문구를 포함하세요."
+        )
+    else:
+        input_parts.append(
+            "이전 대화의 맥락을 유지하고 검색 근거에서 확인되는 내용만 답변하세요. "
+            "이전 답변에서 이미 안내한 내용은 반복하지 마세요. "
+            "현재 질문이 '그다음', '이후', '어떤 조치'처럼 후속 행동을 묻는 경우 "
+            "이전 단계 이후의 행동만 설명하세요."
+        )
 
-    legal_subject = is_legal_subject_question(query)
+    input_text = "\n\n".join(input_parts)
 
     answer = request_answer_text(
         response_client=response_client,
         mode=mode,
         input_text=input_text,
         legal_subject=legal_subject,
+        allow_general_supplement=allow_general_supplement,
     )
+
+    if is_document_scope_refusal(answer):
+        if has_strong_relevance(chunks):
+            evidence_retry_input = (
+                f"{input_text}\n\n"
+                "검색 근거의 관련성 점수가 충분합니다. 질문에 직접 관련된 "
+                "검색 근거를 다시 확인하고 문서 범위 안에서 답변하세요. "
+                "주요 주장에는 실제 검색 근거 인용 번호를 표시하세요."
+            )
+            retry_answer = request_answer_text(
+                response_client=response_client,
+                mode=mode,
+                input_text=evidence_retry_input,
+                legal_subject=legal_subject,
+                allow_general_supplement=allow_general_supplement,
+            )
+            if not is_document_scope_refusal(retry_answer):
+                answer = retry_answer
+            else:
+                return request_general_knowledge_answer(
+                    response_client=response_client,
+                    query=query,
+                    mode=mode,
+                )
+        else:
+            return request_general_knowledge_answer(
+                response_client=response_client,
+                query=query,
+                mode=mode,
+            )
 
     if legal_answer_needs_retry(
         query=query,
@@ -2629,6 +2882,7 @@ def generate_answer(
             mode=mode,
             input_text=completion_retry_input,
             legal_subject=legal_subject,
+            allow_general_supplement=allow_general_supplement,
         )
 
         required_terms = (
@@ -2673,6 +2927,7 @@ def generate_answer(
             mode=mode,
             input_text=awkward_retry_input,
             legal_subject=legal_subject,
+            allow_general_supplement=allow_general_supplement,
         )
 
     if is_refusal_text(answer):
@@ -2688,6 +2943,7 @@ def generate_answer(
             mode=mode,
             input_text=retry_input,
             legal_subject=legal_subject,
+            allow_general_supplement=allow_general_supplement,
         )
 
     if is_refusal_text(answer):
@@ -2701,6 +2957,7 @@ def generate_answer(
     
     if (
         legal_subject
+        and not allow_general_supplement
         and not re.search(r"\[\d+\]", answer)
     ):
         citation_retry_input = (
@@ -2722,6 +2979,7 @@ def generate_answer(
             mode=mode,
             input_text=citation_retry_input,
             legal_subject=legal_subject,
+            allow_general_supplement=allow_general_supplement,
         )
 
         # 재시도 결과가 실제로 더 나을 때만 교체한다.
@@ -2737,6 +2995,7 @@ def generate_answer(
     # 최종 deterministic fallback
     if (
         legal_subject
+        and not allow_general_supplement
         and chunks
         and not re.search(r"\[\d+\]", answer)
     ):
@@ -2747,6 +3006,9 @@ def generate_answer(
         else:
             answer = f"{answer}[1]"
 
+
+    if allow_general_supplement:
+        answer = ensure_mixed_answer_notice(answer, query)
 
     answer = clean_generated_text(answer)
 

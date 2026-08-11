@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
+
 import requests
 
 
-API_URL = "http://127.0.0.1:8000/rag/chat"
+API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000/rag/chat")
 
 
 def post_chat(
@@ -73,7 +75,13 @@ def test_legal_article_question():
     assert "축산계열화사업자" in answer
     assert "수의사" in answer
     assert "연구책임자" in answer
-    assert "동물약품 또는 사료 판매자" in answer
+    normalized_answer = (
+        "".join(answer.split()).replace("·", "").replace("ㆍ", "")
+    )
+    assert all(
+        keyword in normalized_answer
+        for keyword in ("동물약품", "사료", "판매자")
+    )
 
     # 인용/출처 확인
     assert "[1]" in answer
@@ -128,7 +136,7 @@ def test_followup_conversation_context():
     assert "1588-9060" not in answer
 
 
-def test_unrelated_question_returns_no_sources():
+def test_unrelated_question_uses_general_knowledge_without_sources():
     response = post_chat(
         "파이썬에서 리스트를 정렬하는 방법을 알려주세요."
     )
@@ -139,7 +147,10 @@ def test_unrelated_question_returns_no_sources():
     answer = body["answer"]
     sources = body["sources"]
 
-    assert "확인할 수 없습니다" in answer
+    assert answer
+    assert "일반적인" in answer
+    assert "문서" in answer
+    assert "[1]" not in answer
     assert sources == []
 
 

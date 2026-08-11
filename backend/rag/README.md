@@ -14,7 +14,7 @@
 - 복합 질의 라우팅
 - 후속 대화 문맥 처리
 - 문서 근거 citation 표시
-- 문서 범위 밖 질문 거절
+- 문서 범위 밖 질문 일반지식 fallback 및 안전 고지
 - short / normal / detailed 답변 모드
 - 생성 답변 후처리 및 텍스트 정리
 
@@ -27,8 +27,8 @@
 → Azure AI Search
 → Hybrid + Semantic Search
 → 관련 Context 선정
-→ LLM 답변 생성
-→ Citation Resolution
+→ 근거 충분성 판정
+→ 근거 충분: RAG 답변 생성 및 Citation Resolution
+→ 근거 부족: 일반지식 답변 및 안전 고지(sources는 빈 배열, 가짜 citation 금지)
 → Text Cleanup
 → FastAPI Response
-

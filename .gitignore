@@ -21,6 +21,5 @@ data/
 *.mp4
 crops/
 
-# muzzle: 외부 공개 가중치 · 업로드 스테이징
-muzzle/weights/clip/
-upload/
+# Backend local environment
+backend/.env

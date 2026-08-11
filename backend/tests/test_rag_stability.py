@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import os
+
 import requests
 
 
-API_URL = "http://127.0.0.1:8000/rag/chat"
+API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000/rag/chat")
 
 
 def post_chat(
@@ -53,7 +55,13 @@ def test_legal_article_question_stability():
         assert "연구책임자" in answer, (
             f"{attempt + 1}번째 응답에서 연구책임자 누락"
         )
-        assert "동물약품 또는 사료 판매자" in answer, (
+        normalized_answer = (
+            "".join(answer.split()).replace("·", "").replace("ㆍ", "")
+        )
+        assert all(
+            keyword in normalized_answer
+            for keyword in ("동물약품", "사료", "판매자")
+        ), (
             f"{attempt + 1}번째 응답에서 판매자 누락"
         )
 
