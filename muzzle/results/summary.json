@@ -1,0 +1,10 @@
+{
+ "zenodo_top1": 0.9921,
+ "cff_top1": 0.8127,
+ "cff_detection_rate": 0.9925,
+ "cff_n_cows": 67,
+ "zenodo_misassign_at_040": 0.0059,
+ "cff_misassign_at_040": 0.1873,
+ "zenodo_hold_at_040": 0.0138,
+ "cff_hold_at_040": 0.0
+}
