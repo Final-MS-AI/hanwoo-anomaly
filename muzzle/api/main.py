@@ -148,3 +148,6 @@ async def identify(file: UploadFile = File(...),
 
 from video_router import router as video_router
 app.include_router(video_router, prefix="/muzzle")
+
+from tracks_router import router as tracks_router
+app.include_router(tracks_router, prefix="/muzzle")
