@@ -1,0 +1,15 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+uploads/
+inference_results/
+ocr_uploads/
+ocr_image_uploads/
+ocr_results/
+feedback_evidence/
+feedback_exports/
+*.log
+

@@ -1,0 +1,77 @@
+hanwoo.koreacentral.cloudapp.azure.com {
+	handle /db-test {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /health {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /anomalies/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /auth/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /inference/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /cattle {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /ear-tag* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /ocr/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	@deviceApi path \
+ /devices/claim \
+ /devices/*/heartbeat \
+ /devices/*/telemetry \
+ /devices/*/commands/pending \
+ /devices/*/state
+
+	handle @deviceApi {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /actuators {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /rag/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+	handle /muzzle/* {
+		reverse_proxy 127.0.0.1:8001
+	}
+
+	handle /devices/claim-code/send {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /devices/mine {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /devices/connection {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle /devices/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
+	handle {
+		root * /var/www/hanwoo
+		try_files {path} /index.html
+		file_server
+	}
+}

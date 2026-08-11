@@ -1,0 +1,39 @@
+{
+  "total": 60,
+  "correct": 60,
+  "mismatch": 0,
+  "accuracy": 1.0,
+  "per_route": {
+    "composite_outbreak_action": {
+      "total": 2,
+      "correct": 2,
+      "accuracy": 1.0
+    },
+    "disease_info": {
+      "total": 11,
+      "correct": 11,
+      "accuracy": 1.0
+    },
+    "field_action": {
+      "total": 18,
+      "correct": 18,
+      "accuracy": 1.0
+    },
+    "legal": {
+      "total": 10,
+      "correct": 10,
+      "accuracy": 1.0
+    },
+    "outbreak_analysis": {
+      "total": 9,
+      "correct": 9,
+      "accuracy": 1.0
+    },
+    "support_program": {
+      "total": 10,
+      "correct": 10,
+      "accuracy": 1.0
+    }
+  },
+  "mismatches": []
+}

@@ -1,0 +1,15 @@
+[Unit]
+Description=Hanwoo FastAPI Service
+After=network.target
+
+[Service]
+User=azureuser
+Group=azureuser
+WorkingDirectory=/home/azureuser/3rd_fastapi
+EnvironmentFile=/home/azureuser/3rd_fastapi/.env
+ExecStart=/home/azureuser/3rd_fastapi/venv/bin/python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
