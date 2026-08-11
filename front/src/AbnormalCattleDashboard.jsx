@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from "react";
 import "./AbnormalCattleDashboard.css";
+import DashboardAlertFeedback from "./DashboardAlertFeedback";
 import {
   abnormalCattle,
   cattleSummary,
@@ -141,6 +142,8 @@ function AbnormalCattleDashboard() {
                 </span>
 
                 <time>{cattle.lastDetectedAt}</time>
+
+                <DashboardAlertFeedback cattle={cattle} />
               </article>
             ))}
           </div>

@@ -52,7 +52,10 @@ function DemoVideoSelector({ onInferenceComplete }) {
       clearInterval(timerRef.current);
     }
 
-    setSelectedVideo(video);
+    setSelectedVideo({
+      ...video,
+      sourceVideoUrl: video.videoUrl,
+    });
     setJobStatus("idle");
     setProgress(0);
     setDetectedCattle([]);
