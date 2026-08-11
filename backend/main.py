@@ -20,6 +20,7 @@ from exclusive_device_api import router as exclusive_device_router
 from device_disconnect_api import router as device_disconnect_router
 from auth_session import create_session_cookie, router as auth_session_router
 from feedback_api import router as feedback_router
+from dashboard_api import router as dashboard_router
 
 # ---------------------------------------------------------
 # 환경변수 로딩
@@ -96,6 +97,7 @@ app.include_router(exclusive_device_router)
 app.include_router(device_disconnect_router)
 app.include_router(auth_session_router)
 app.include_router(feedback_router)
+app.include_router(dashboard_router)
 
 
 # ---------------------------------------------------------
