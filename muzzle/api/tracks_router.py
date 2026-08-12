@@ -134,3 +134,67 @@ def list_tracks(camera_id: str | None = None, bound: bool | None = None, limit: 
 def _count(c, segment_id: int) -> int:
     return c.execute("SELECT count(*) FROM public.track_observation WHERE segment_id=%s",
                      (segment_id,)).fetchone()[0]
+
+# 테스트 데이터는 지우지 않고 session_id 접두어로 격리한다.
+#   test_*  검증용 — 기본 응답에서 제외
+#   demo_*  발표용, 그 외 실데이터 — 노출
+# 새 컬럼을 만들지 않는 이유: ALTER 는 팀 공용 DB 에 위험하고(2026-08-04),
+# session_id 는 이미 "추적 1회 실행 단위"라 의미가 어긋나지 않는다.
+TEST_SESSION_PREFIX = "test_"
+
+
+@router.get("/cattle/{national_id}/timeline")
+def cattle_timeline(national_id: str,
+                    start: str | None = None,
+                    end: str | None = None,
+                    include_test: bool = Query(False, description="test_* 세션 포함 여부"),
+                    limit: int = Query(2000, ge=1, le=20000)):
+    """개체별 관측 시계열. 이상행동 파트 인계용 최종 산출물.
+
+    바인딩 이전 구간도 포함된다 — 뷰가 JOIN 으로 소급 적용하기 때문이다.
+    선택 필터는 SQL 에 항상 넣지 않고 필요한 것만 조립한다 (IndeterminateDatatype 회피).
+    """
+    where, params = ["national_id = %s"], [national_id]
+    if not include_test:
+        where.append("session_id NOT LIKE %s")
+        params.append(TEST_SESSION_PREFIX + "%")
+    if start is not None:
+        where.append("ts >= %s")
+        params.append(start)
+    if end is not None:
+        where.append("ts <= %s")
+        params.append(end)
+    cond = " AND ".join(where)
+
+    with conn() as c:
+        segs = c.execute(f"""
+            SELECT segment_id, camera_id, track_id, session_id,
+                   min(ts), max(ts), count(*), max(similarity), max(source)
+            FROM public.v_identified_track_observation
+            WHERE {cond}
+            GROUP BY segment_id, camera_id, track_id, session_id
+            ORDER BY min(ts)""", params).fetchall()
+
+        rows = c.execute(f"""
+            SELECT ts, camera_id, segment_id, track_id, frame_idx,
+                   bbox_x, bbox_y, bbox_w, bbox_h, conf, similarity
+            FROM public.v_identified_track_observation
+            WHERE {cond}
+            ORDER BY ts
+            LIMIT %s""", params + [limit]).fetchall()
+
+    return {
+        "national_id": national_id,
+        "include_test": include_test,
+        "segment_count": len(segs),
+        "observation_count": len(rows),
+        "truncated": len(rows) >= limit,
+        "segments": [
+            {"segment_id": s[0], "camera_id": s[1], "track_id": s[2], "session_id": s[3],
+             "started_at": s[4], "ended_at": s[5], "observations": s[6],
+             "similarity": s[7], "source": s[8]} for s in segs],
+        "observations": [
+            {"ts": r[0], "camera_id": r[1], "segment_id": r[2], "track_id": r[3],
+             "frame_idx": r[4], "bbox": [r[5], r[6], r[7], r[8]],
+             "conf": r[9], "similarity": r[10]} for r in rows],
+    }
