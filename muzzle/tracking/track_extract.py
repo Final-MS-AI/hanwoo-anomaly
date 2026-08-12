@@ -18,6 +18,10 @@ p.add_argument("--classes", default="19", help="COCO cow=19. 전체는 빈 문�
 p.add_argument("--conf", type=float, default=0.25)
 p.add_argument("--stride", type=int, default=5)
 p.add_argument("--max-frames", type=int, default=120)
+p.add_argument("--session", default=None,
+               help="세션 ID 직접 지정")
+p.add_argument("--session-prefix", default="",
+               help="자동 생성 세션 ID 앞에 붙일 접두어. test_ 는 timeline 기본 응답에서 제외된다")
 a = p.parse_args()
 
 classes = [int(x) for x in a.classes.split(",")] if a.classes.strip() else None
@@ -26,7 +30,9 @@ cap = cv2.VideoCapture(a.video)
 fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 cap.release()
 
-session_id = datetime.now().strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:6]
+session_id = a.session or (a.session_prefix
+                           + datetime.now().strftime("%Y%m%d%H%M%S")
+                           + "-" + uuid.uuid4().hex[:6])
 base = datetime.now(timezone.utc)
 
 model = YOLO(a.weights)
