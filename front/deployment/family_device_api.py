@@ -372,4 +372,4 @@ def device_state(device_id: str, cowow_session: str | None = Cookie(default=None
             row = cursor.fetchone()
     if not row:
         return {"deviceId": device_id, "online": False, "lastSeenAt": None, "sensors": {}}
-    return {"deviceId": device_id, "firmwareVersion": row[0], "wifiRssi": row[1], "lastSeenAt": row[2].isoformat() if row[2] else None, "telemetryAt": row[7].isoformat() if row[7] else None, "online": bool(row[8]), "sensors": {"temperature": row[3], "humidity": row[4], "ammonia": row[5], "carbonDioxide": row[6]}}
+    return {"deviceId": device_id, "firmwareVersion": row[0], "wifiRssi": row[1], "lastSeenAt": row[2].isoformat() if row[2] else None, "telemetryAt": row[7].isoformat() if row[7] else None, "online": bool(row[8]), "sensors": {"temperature": row[3], "humidity": row[4], "airQuality": row[5]}}
