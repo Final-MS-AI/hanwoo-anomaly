@@ -805,6 +805,25 @@ def rewrite_query(
     if len(rewritten) > 500:
         return fallback_query
 
+    previous_web_service_context = any(
+        message["role"] == "user"
+        and is_web_service_question(message["content"])
+        for message in normalize_conversation(
+            messages,
+            max_messages=4,
+            max_chars=2000,
+        )
+    )
+
+    # 짧은 후속 질문을 재작성하면서 귀표 등록 등 서비스 맥락이 빠지면
+    # 로컬 사용 가이드 대신 무관한 외부 문서를 검색하게 된다. 이 경우에는
+    # 이전 사용자 질문을 보존하는 deterministic fallback을 사용한다.
+    if (
+        previous_web_service_context
+        and not is_web_service_question(rewritten)
+    ):
+        return fallback_query
+
     return rewritten
 
 def build_clients() -> tuple[SearchClient, AzureOpenAI, OpenAI]:
@@ -1282,11 +1301,11 @@ def clean_generated_text(text: str) -> str:
         text,
     )
 
-    # 답변 마지막에 독립적으로 남은 인용 제거
-    # 예: 지원 가능[1]. [2] -> 지원 가능[1].
+    # 문단 끝에서 문장 없이 분리된 인용은 하나의 인용 그룹으로 합친다.
+    # 예: 다시 시도하세요[1]. [2] -> 다시 시도하세요[1][2].
     text = re.sub(
-        r"(\[\d+\])\.\s+\[\d+\]\s*$",
-        r"\1.",
+        r"((?:\[\d+\])+)\.\s*((?:\[\d+\])+)(?=\s*(?:\n|$))",
+        r"\1\2.",
         text,
     )
 
@@ -1826,6 +1845,22 @@ def clean_generated_text(text: str) -> str:
 
     return text.strip()
 
+
+def clean_service_guide_text(text: str) -> str:
+    """웹 사용 가이드 답변에만 적용하는 간결한 형식 정리."""
+    text = re.sub(
+        r"(?m)^\s*추가\s*설명(?:\s*\([^)]*\))?\s*:?\s*$",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"(?m)^\s*\)\s*:?\s*$",
+        "",
+        text,
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
 def remove_generated_sources(answer: str) -> str:
     """모델이 임의로 생성한 출처 영역을 제거한다."""
     answer = re.split(
@@ -1863,6 +1898,17 @@ def resolve_cited_sources(
     max_sources: int,
 ) -> GeneratedAnswer:
     answer = remove_generated_sources(answer)
+
+    # The model can occasionally echo a bracketed chunk ID even though the
+    # prompt asks for numeric citations. Convert only IDs from the supplied
+    # context so internal identifiers never leak into the user-facing answer.
+    for number, chunk in enumerate(chunks, start=1):
+        answer = re.sub(
+            rf"\[\s*{re.escape(chunk.id)}\s*\]",
+            f"[{number}]",
+            answer,
+        )
+
     answer = deduplicate_citation_groups(answer)
 
     cited_numbers: list[int] = []
@@ -2694,6 +2740,29 @@ def build_fmd_post_report_action_answer(
             cited_chunks=cited_chunks[:2],
         )
 
+    is_farm_exit_question = any(
+        keyword in normalized_query
+        for keyword in (
+            "농장을 나가",
+            "농장 밖으로 나가",
+            "농장을 떠나",
+            "농장 밖에 나가",
+            "외출해도 되",
+            "외출해도 되나요",
+        )
+    )
+
+    if is_farm_exit_question:
+        text = (
+            f"방역기관이 별도로 허용하기 전에는 농장을 임의로 떠나지 말고, "
+            f"농장 안에서 연락 가능한 상태로 대기해야 합니다{citation_1}."
+        )
+
+        return GeneratedAnswer(
+            text=text,
+            cited_chunks=cited_chunks[:1],
+        )
+
     is_wait_duration_question = any(
         keyword in normalized_query
         for keyword in (
@@ -2892,6 +2961,11 @@ def generate_answer(
             chunks=chunks,
         )
 
+    service_guide_answer = bool(chunks) and all(
+        chunk.document_type == "service_guide"
+        for chunk in chunks
+    )
+
     context = build_context(chunks)
 
     conversation_text = build_conversation_text(
@@ -2918,6 +2992,17 @@ def generate_answer(
     input_parts.append(
         f"검색 근거:\n{context}"
     )
+
+    if service_guide_answer:
+        input_parts.append(
+            "현재 질문은 COWOW 웹 서비스 사용법에 관한 질문입니다. "
+            "사용자가 바로 실행할 핵심 조치를 먼저 답하고, 같은 내용을 "
+            "요약과 추가 설명으로 반복하지 마세요. "
+            "답변은 제목 없이 최대 5문장으로 간결하게 작성하세요. "
+            "목록이 꼭 필요한 절차만 최대 3개 항목으로 작성하세요. "
+            "'추가 설명', '직접 답변', '요약' 같은 메타 제목을 작성하지 마세요. "
+            "인용 번호만 따로 문장처럼 출력하지 말고 관련 문장 끝에 붙이세요."
+        )
 
     
 
@@ -3227,6 +3312,9 @@ def generate_answer(
         answer = ensure_mixed_answer_notice(answer, query)
 
     answer = clean_generated_text(answer)
+
+    if service_guide_answer:
+        answer = clean_service_guide_text(answer)
 
     return resolve_cited_sources(
         answer=answer,

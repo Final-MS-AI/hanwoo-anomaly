@@ -927,7 +927,7 @@
   flex-direction: column;
   width: min(760px, calc(100% - 48px));
   min-width: 0;
-  min-height: 620px;
+  min-height: 700px;
   margin: 28px auto 24px;
   padding: 24px;
   background: #fff;
@@ -1107,6 +1107,42 @@
   font-weight: 700;
 }
 
+.rag-suggestion-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rag-suggestion-tabs button {
+  min-height: 32px;
+  padding: 6px 12px;
+  color: #806b56;
+  background: #f7f3ed;
+  border: 1px solid #e4dacf;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rag-suggestion-tabs button:hover {
+  background: #fff5e8;
+  border-color: #c8ad91;
+}
+
+.rag-suggestion-tabs button.active {
+  color: #fff;
+  background: #2f7042;
+  border-color: #2f7042;
+}
+
+.rag-suggestion-tabs button:focus-visible {
+  outline: 2px solid #2f7042;
+  outline-offset: 2px;
+}
+
 .rag-suggestions {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1167,6 +1203,10 @@
   border: 1px solid #e4dacf;
   border-radius: 15px;
   box-sizing: border-box;
+}
+
+.rag-chat-page.initial .rag-chat-form {
+  margin-top: auto;
 }
 
 .rag-chat-form textarea {
@@ -1561,6 +1601,16 @@
 
   .rag-suggestion-panel {
     padding-bottom: 10px;
+  }
+
+  .rag-suggestion-tabs {
+    overflow-x: auto;
+    padding: 1px 1px 3px;
+    scrollbar-width: none;
+  }
+
+  .rag-suggestion-tabs::-webkit-scrollbar {
+    display: none;
   }
 
   .rag-suggestions {
