@@ -7,18 +7,36 @@ const API_BASE_URL =
 const RAG_API_URL =
   import.meta.env.VITE_RAG_API_URL || `${API_BASE_URL}/rag/chat`;
 
-const suggestedQuestions = [
-  "귀표 이미지 등록이 실패하면 어떻게 해야 하나요?",
-  "웹에서 영상 분석은 어떻게 시작하나요?",
-  "AI 판단이 잘못됐을 때 검토 요청은 어떻게 하나요?",
-  "비문 사진 등록이 실패하는 이유는 무엇인가요?",
-  "장비 등록 코드는 어디에 입력하나요?",
-  "주의 개체와 위험 개체의 기준은 무엇인가요?",
-  "오류 화면 캡처를 AI 상담에 첨부할 수 있나요?",
-  "구제역 의심축을 발견하면 무엇을 해야 하나요?",
-  "구제역 의심축은 어디에 신고해야 하나요?",
-  "구제역 의심축을 신고한 다음 농장주는 무엇을 해야 하나요?",
-  "가축전염병 예방법 제11조에서 신고해야 하는 사람은 누구인가요?",
+const suggestedQuestionCategories = [
+  {
+    id: "service",
+    label: "서비스 사용법",
+    questions: [
+      "귀표 이미지 등록이 실패하면 어떻게 해야 하나요?",
+      "웹에서 영상 분석은 어떻게 시작하나요?",
+      "AI 판단이 잘못됐을 때 검토 요청은 어떻게 하나요?",
+      "비문 사진 등록이 실패하는 이유는 무엇인가요?",
+      "장비 등록 코드는 어디에 입력하나요?",
+      "주의 개체와 위험 개체의 기준은 무엇인가요?",
+      "오류 화면 캡처를 AI 상담에 첨부할 수 있나요?",
+    ],
+  },
+  {
+    id: "fmd",
+    label: "구제역·방역",
+    questions: [
+      "구제역 의심축을 발견하면 무엇을 해야 하나요?",
+      "구제역 의심축은 어디에 신고해야 하나요?",
+      "구제역 의심축을 신고한 다음 농장주는 무엇을 해야 하나요?",
+    ],
+  },
+  {
+    id: "law",
+    label: "법령",
+    questions: [
+      "가축전염병 예방법 제11조에서 신고해야 하는 사람은 누구인가요?",
+    ],
+  },
 ];
 
 function normalizeSources(data) {
@@ -63,7 +81,15 @@ function RagChatbot() {
   ]);
   const [question, setQuestion] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [activeSuggestionCategory, setActiveSuggestionCategory] = useState(
+    suggestedQuestionCategories[0].id,
+  );
   const messageEndRef = useRef(null);
+
+  const activeSuggestedQuestions =
+    suggestedQuestionCategories.find(
+      (category) => category.id === activeSuggestionCategory,
+    )?.questions ?? suggestedQuestionCategories[0].questions;
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -133,7 +159,9 @@ function RagChatbot() {
   };
 
   return (
-    <section className="rag-chat-page">
+    <section
+      className={`rag-chat-page ${messages.length === 1 ? "initial" : ""}`}
+    >
       <div className="rag-chat-header">
         <div>
           <span className="rag-status"><i /> 문서 기반 답변</span>
@@ -181,8 +209,27 @@ function RagChatbot() {
       {messages.length === 1 && (
         <div className="rag-suggestion-panel">
           <p className="rag-suggestions-title">이런 질문을 해보세요</p>
-          <div className="rag-suggestions">
-            {suggestedQuestions.map((suggestion) => (
+          <div className="rag-suggestion-tabs" role="tablist" aria-label="예시 질문 분류">
+            {suggestedQuestionCategories.map((category) => (
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeSuggestionCategory === category.id}
+                aria-controls="rag-suggestion-list"
+                className={activeSuggestionCategory === category.id ? "active" : ""}
+                key={category.id}
+                onClick={() => setActiveSuggestionCategory(category.id)}
+              >
+                {category.label}
+              </button>
+            ))}
+          </div>
+          <div
+            className="rag-suggestions"
+            id="rag-suggestion-list"
+            role="tabpanel"
+          >
+            {activeSuggestedQuestions.map((suggestion) => (
               <button
                 type="button"
                 key={suggestion}

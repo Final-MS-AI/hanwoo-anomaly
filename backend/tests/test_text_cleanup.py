@@ -1,4 +1,4 @@
-from rag.rag_answer import clean_generated_text
+from rag.rag_answer import clean_generated_text, clean_service_guide_text
 
 
 def test_remove_answer_prefix():
@@ -133,3 +133,26 @@ def test_remove_standalone_direct_answer_heading():
 
     assert "직접적 답변" not in cleaned
     assert "지원조건은 융자 80%·자부담 20%입니다[1]." in cleaned
+
+
+def test_remove_broken_additional_explanation_heading():
+    text = (
+        "다른 사진으로 다시 시도하세요[1].\n\n"
+        "추가 설명 (\n\n"
+        "):\n"
+        "귀표 번호를 직접 입력할 수도 있습니다[2]."
+    )
+
+    cleaned = clean_service_guide_text(clean_generated_text(text))
+
+    assert "추가 설명" not in cleaned
+    assert "\n):" not in cleaned
+    assert "귀표 번호를 직접 입력" in cleaned
+
+
+def test_merge_standalone_citation_at_paragraph_end():
+    text = "다른 사진으로 다시 시도하세요[1]. [2]"
+
+    cleaned = clean_generated_text(text)
+
+    assert cleaned == "다른 사진으로 다시 시도하세요[1][2]."
