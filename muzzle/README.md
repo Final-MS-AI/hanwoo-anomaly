@@ -12,6 +12,7 @@
 | `train/` | 학습 노트북 (Colab) |
 | `weights/` | ONNX 인코더 + PyTorch 체크포인트 |
 | `deploy/` | systemd 유닛, Caddy 라우팅 발췌 |
+| `tracking/` | 영상 추적 추출·적재 스크립트 |
 | `docs/` | 모델 카드, API·DB·배포 기록 |
 | `results/` | 평가 결과 |
 | `THRESHOLD_POLICY.md` | 운영 임계값 근거 |
@@ -59,6 +60,10 @@ export MUZZLE_ONNX_PATH=/path/to/muzzle_encoder.onnx
 | `POST /muzzle/identify` | 식별 (`file`, `threshold`) |
 | `GET /muzzle/videos` | ROI 등록된 영상 목록 |
 | `POST /muzzle/videos/{name}/identify` | 영상 개체 확정 |
+| `GET /muzzle/tracks` | 트랙 목록 (`bound=false` 로 미확정만) |
+| `GET /muzzle/tracks/{id}` | 트랙 + 현재 바인딩 |
+| `POST /muzzle/tracks/{id}/bind` | 트랙에 개체 바인딩 |
+| `DELETE /muzzle/tracks/{id}/bind` | 바인딩 해제 |
 
 Caddy가 `/muzzle` 접두어를 **제거하지 않는다.** 라우트에 접두어를 포함할 것.
 
@@ -69,6 +74,9 @@ Caddy가 `/muzzle` 접두어를 **제거하지 않는다.** 라우트에 접두�
 3. 입력은 **코 크롭 이미지**여야 한다. 원본에서 코를 찾는 것은 검출 파트 역할.
 4. 개체 집계 시 `WHERE status = 'active'`.
 5. `pkill -f uvicorn` 금지 — 8000·8001이 함께 죽는다. 포트를 명시할 것.
+6. 트랙에 개체를 붙일 때는 `POST /muzzle/tracks/{segment_id}/bind` 를 쓸 것. `track_identity_binding` 에 직접 INSERT 하면 임계값 검사와 충돌 규칙을 건너뛴다.
+7. `decision` 이 `unconfirmed` 면 바인딩을 호출하지 말 것. 유사도 0.70 미만은 API 가 422 로 거부한다.
+8. 개체별 시계열은 `v_identified_track_observation` 뷰를 조회할 것. `track_observation` 을 직접 보면 개체번호가 없다.
 
 ## 알려진 한계
 
