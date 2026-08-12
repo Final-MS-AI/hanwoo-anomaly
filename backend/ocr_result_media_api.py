@@ -18,8 +18,10 @@ router = APIRouter(
 )
 
 
-OCR_RESULTS_ROOT = Path(
-    "/home/azureuser/3rd_fastapi/ocr_results"
+BASE_DIR = Path(__file__).resolve().parent
+
+OCR_RESULTS_ROOT = (
+    BASE_DIR / "ocr_results"
 ).resolve()
 
 ALLOWED_IMAGE_SUFFIXES = {
