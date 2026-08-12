@@ -547,6 +547,36 @@ BIOSECURITY_GENERAL_NOTICE = (
     "수의사의 지시를 우선해 주세요."
 )
 
+REALTIME_WEATHER_UNAVAILABLE_ANSWER = (
+    "현재 COWOW AI 상담에서는 실시간 날씨를 조회할 수 없습니다. "
+    "정확한 기온·강수·미세먼지 정보는 기상청 날씨누리나 "
+    "사용 중인 날씨 앱에서 확인해 주세요."
+)
+
+
+def is_realtime_weather_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    weather_keywords = (
+        "날씨", "기온", "강수", "강수량", "비가", "눈이",
+        "미세먼지", "초미세먼지", "체감온도", "풍속", "기상 예보",
+    )
+    realtime_markers = (
+        "오늘", "내일", "모레", "지금", "현재", "실시간",
+        "이번 주", "이번주", "주말", "최신", "예보",
+    )
+    direct_weather_requests = (
+        "날씨 알려", "날씨가 어때", "날씨는 어때", "날씨 어떤",
+        "기온 알려", "몇 도", "비 오", "눈 오",
+    )
+
+    has_weather_keyword = any(
+        keyword in normalized for keyword in weather_keywords
+    )
+    return has_weather_keyword and (
+        any(marker in normalized for marker in realtime_markers)
+        or any(pattern in normalized for pattern in direct_weather_requests)
+    )
+
 
 def is_legal_or_support_question(query: str) -> bool:
     normalized = normalize_text(query)
@@ -2816,6 +2846,12 @@ def generate_answer(
     messages: list[dict[str, str]] | None = None,
     search_query: str | None = None,
 ) -> GeneratedAnswer:
+    if is_realtime_weather_question(query):
+        return GeneratedAnswer(
+            text=REALTIME_WEATHER_UNAVAILABLE_ANSWER,
+            cited_chunks=[],
+        )
+
     if not chunks:
         return request_general_knowledge_answer(
             response_client=response_client,

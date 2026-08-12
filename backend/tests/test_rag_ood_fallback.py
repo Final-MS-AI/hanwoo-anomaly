@@ -88,6 +88,39 @@ def test_complete_ood_uses_general_knowledge_without_fake_citations(monkeypatch)
     assert result.cited_chunks == []
 
 
+def test_realtime_weather_question_returns_short_fixed_guidance(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
+    client = FakeClient("호출되면 안 되는 모델 응답입니다.")
+
+    result = generate_answer(
+        query="오늘 서울 날씨는 어떤가요?",
+        chunks=[],
+        response_client=client,
+        mode="normal",
+    )
+
+    assert "실시간 날씨를 조회할 수 없습니다" in result.text
+    assert "기상청 날씨누리" in result.text
+    assert "일반적인 지식" not in result.text
+    assert result.cited_chunks == []
+    assert client.responses.calls == []
+
+
+def test_livestock_management_in_hot_weather_uses_normal_fallback(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
+    client = FakeClient("그늘과 충분한 물을 제공하세요.")
+
+    result = generate_answer(
+        query="더운 날씨에 소를 어떻게 관리하나요?",
+        chunks=[],
+        response_client=client,
+        mode="normal",
+    )
+
+    assert "그늘과 충분한 물" in result.text
+    assert len(client.responses.calls) == 1
+
+
 def test_ood_token_limit_ends_with_follow_up_guidance(monkeypatch):
     monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
     client = FakeClient(

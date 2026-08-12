@@ -103,8 +103,8 @@ TEST_CASES: list[dict[str, Any]] = [
         "name": "문서 범위 밖 질문",
         "question": "오늘 서울 날씨는 어떤가요?",
         "required_any": [
-            "일반적인 지식",
-            "일반적인 정보",
+            "실시간 날씨를 조회할 수 없습니다",
+            "기상청 날씨누리",
         ],
         "required_all": [],
         "forbidden": [
