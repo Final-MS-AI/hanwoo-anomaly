@@ -8,25 +8,47 @@ const RAG_API_URL =
   import.meta.env.VITE_RAG_API_URL || `${API_BASE_URL}/rag/chat`;
 
 const suggestedQuestions = [
-  "장시간 누워 있는 소는 어떻게 확인하나요?",
-  "주의 개체와 위험 개체의 차이가 뭔가요?",
-  "귀표 등록 절차를 알려줘",
+  "귀표 이미지 등록이 실패하면 어떻게 해야 하나요?",
+  "웹에서 영상 분석은 어떻게 시작하나요?",
+  "AI 판단이 잘못됐을 때 검토 요청은 어떻게 하나요?",
+  "비문 사진 등록이 실패하는 이유는 무엇인가요?",
+  "장비 등록 코드는 어디에 입력하나요?",
+  "주의 개체와 위험 개체의 기준은 무엇인가요?",
+  "오류 화면 캡처를 AI 상담에 첨부할 수 있나요?",
+  "구제역 의심축을 발견하면 무엇을 해야 하나요?",
+  "구제역 의심축은 어디에 신고해야 하나요?",
+  "구제역 의심축을 신고한 다음 농장주는 무엇을 해야 하나요?",
+  "가축전염병 예방법 제11조에서 신고해야 하는 사람은 누구인가요?",
 ];
 
 function normalizeSources(data) {
   const sources = data?.sources ?? data?.references ?? data?.citations ?? [];
 
-  return sources.map((source, index) => {
+  const normalizedSources = sources.map((source, index) => {
     if (typeof source === "string") {
       return { id: `${index}-${source}`, title: source };
     }
 
+    const rawPage = source.page ?? source.page_number ?? null;
+    const page =
+      typeof rawPage === "string" && rawPage.trim() === "페이지 정보 없음"
+        ? null
+        : rawPage;
+
     return {
       id: source.id ?? `${index}-${source.title ?? source.name ?? "source"}`,
       title: source.title ?? source.name ?? source.document ?? `출처 ${index + 1}`,
-      page: source.page ?? source.page_number ?? null,
+      page,
     };
   });
+
+  return normalizedSources.filter(
+    (source, index, allSources) =>
+      allSources.findIndex(
+        (candidate) =>
+          candidate.title === source.title && candidate.page === source.page,
+      ) === index,
+  );
 }
 
 function RagChatbot() {
@@ -121,7 +143,10 @@ function RagChatbot() {
         <span className="rag-badge">RAG</span>
       </div>
 
-      <div className="rag-message-list" aria-live="polite">
+      <div
+        className={`rag-message-list ${messages.length === 1 ? "initial" : ""}`}
+        aria-live="polite"
+      >
         {messages.map((message) => (
           <article
             className={`rag-message ${message.role} ${message.isError ? "error" : ""}`}
@@ -154,16 +179,20 @@ function RagChatbot() {
       </div>
 
       {messages.length === 1 && (
-        <div className="rag-suggestions">
-          {suggestedQuestions.map((suggestion) => (
-            <button
-              type="button"
-              key={suggestion}
-              onClick={() => sendQuestion(suggestion)}
-            >
-              {suggestion}
-            </button>
-          ))}
+        <div className="rag-suggestion-panel">
+          <p className="rag-suggestions-title">이런 질문을 해보세요</p>
+          <div className="rag-suggestions">
+            {suggestedQuestions.map((suggestion) => (
+              <button
+                type="button"
+                key={suggestion}
+                onClick={() => sendQuestion(suggestion)}
+              >
+                <span>{suggestion}</span>
+                <i aria-hidden="true">→</i>
+              </button>
+            ))}
+          </div>
         </div>
       )}
 

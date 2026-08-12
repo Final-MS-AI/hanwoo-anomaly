@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
 ROOT = Path(__file__).resolve().parents[1]
+WEB_SERVICE_GUIDE_PATH = Path(__file__).with_name("web_service_guide.md")
 
 try:
     from .query_router import route_query
@@ -62,6 +63,11 @@ ANSWER_MODES = {
     },
 }
 
+GENERAL_KNOWLEDGE_CONTINUATION_NOTICE = (
+    "답변이 길어 여기까지만 표시했습니다. 추가 응답을 원하시면 "
+    "'이어서 설명해 주세요'라고 입력해 주세요."
+)
+
 
 @dataclass
 class RetrievedChunk:
@@ -91,6 +97,130 @@ class RetrievedChunk:
 class GeneratedAnswer:
     text: str
     cited_chunks: list[RetrievedChunk]
+
+
+WEB_SERVICE_KEYWORDS = (
+    "cowow",
+    "코와우",
+    "웹",
+    "앱",
+    "사이트",
+    "화면",
+    "페이지",
+    "메뉴",
+    "버튼",
+    "대시보드",
+    "이상 개체",
+    "주의 개체",
+    "위험 개체",
+    "영상 분석",
+    "영상 선택",
+    "소 등록",
+    "귀표 등록",
+    "귀표 이미지",
+    "귀표 사진",
+    "귀표 번호 인식",
+    "비문 등록",
+    "비문 사진",
+    "ai 상담",
+    "채팅",
+    "환경 제어",
+    "장비 등록",
+    "장비 연결",
+    "게스트 로그인",
+    "google 로그인",
+    "로그인 실패",
+    "ai 판단이 잘못",
+    "검토 요청",
+)
+
+WEB_SERVICE_SECTION_KEYWORDS = {
+    "로그인과 화면 이동": ("로그인", "게스트", "메뉴", "이동", "페이지"),
+    "이상 개체 대시보드와 AI 판단 피드백": (
+        "대시보드", "이상 개체", "주의", "위험", "ai 판단", "피드백", "검토 요청"
+    ),
+    "영상 분석 사용법": ("영상", "분석", "탐지", "추적", "진행률", "결과 영상"),
+    "소 등록과 귀표 OCR": (
+        "소 등록", "귀표", "ocr", "번호", "이미지", "사진", "인식", "판독"
+    ),
+    "비문 사진 등록": ("비문", "코 무늬", "일치도", "임베딩"),
+    "AI 상담 사용법": ("ai 상담", "채팅", "질문", "답변", "참고 문서", "이어서"),
+    "축사 환경 제어와 장비 연결": (
+        "환경", "장비", "esp32", "센서", "환기팬", "물 뿌리기", "등록 코드"
+    ),
+    "자주 발생하는 오류 대응": ("오류", "실패", "안 돼", "안돼", "문제", "재시도"),
+}
+
+
+def is_web_service_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    return any(keyword in normalized for keyword in WEB_SERVICE_KEYWORDS)
+
+
+def _load_web_service_sections() -> list[tuple[str, str]]:
+    if not WEB_SERVICE_GUIDE_PATH.exists():
+        raise FileNotFoundError(
+            f"웹 서비스 가이드 파일을 찾을 수 없습니다: {WEB_SERVICE_GUIDE_PATH}"
+        )
+
+    sections: list[tuple[str, str]] = []
+    title: str | None = None
+    lines: list[str] = []
+
+    for line in WEB_SERVICE_GUIDE_PATH.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            if title and lines:
+                sections.append((title, "\n".join(lines).strip()))
+            title = line[3:].strip()
+            lines = []
+        elif title:
+            lines.append(line)
+
+    if title and lines:
+        sections.append((title, "\n".join(lines).strip()))
+
+    return sections
+
+
+def retrieve_web_service_guide(
+    query: str,
+    max_chunks: int,
+) -> tuple[dict[str, Any], list[RetrievedChunk]]:
+    normalized_query = normalize_text(query)
+    query_tokens = content_fingerprint(normalized_query)
+    ranked: list[tuple[int, int, str, str]] = []
+
+    for index, (title, content) in enumerate(_load_web_service_sections()):
+        keywords = WEB_SERVICE_SECTION_KEYWORDS.get(title, ())
+        keyword_score = sum(
+            3 for keyword in keywords if normalize_text(keyword) in normalized_query
+        )
+        section_tokens = content_fingerprint(f"{title} {content}")
+        overlap_score = len(query_tokens & section_tokens)
+        ranked.append((keyword_score + overlap_score, -index, title, content))
+
+    ranked.sort(reverse=True)
+    selected = ranked[:max_chunks]
+    chunks = [
+        RetrievedChunk(
+            id=f"cowow-service-guide-{index + 1}",
+            document_title="COWOW 웹 서비스 사용 가이드",
+            document_type="service_guide",
+            page_start=None,
+            page_end=None,
+            section_path=title,
+            content=content,
+            score=5.0,
+            reranker_score=5.0,
+        )
+        for index, (_, _, title, content) in enumerate(selected)
+    ]
+
+    return (
+        {"route": "service_guide", "filter": None, "top_k": max_chunks},
+        chunks,
+    )
+
 
 def require_env(name: str) -> str:
     value = os.getenv(name)
@@ -689,8 +819,15 @@ def retrieve(
     aoai: AzureOpenAI,
     mode: str,
 ) -> tuple[dict[str, Any], list[RetrievedChunk]]:
-    route = dict(route_query(query))
     config = ANSWER_MODES[mode]
+
+    if is_web_service_question(query):
+        return retrieve_web_service_guide(
+            query=query,
+            max_chunks=config["max_context_chunks"],
+        )
+
+    route = dict(route_query(query))
 
     if is_support_eligibility_question(query):
         route["route"] = "support_eligibility"
@@ -1818,6 +1955,26 @@ def request_general_knowledge_answer(
         reasoning={"effort": "minimal"},
         max_output_tokens=ANSWER_MODES[mode]["max_output_tokens"],
     )
+    incomplete_details = getattr(response, "incomplete_details", None)
+    incomplete_reason = (
+        incomplete_details.get("reason")
+        if isinstance(incomplete_details, dict)
+        else getattr(incomplete_details, "reason", None)
+    )
+    output_token_limit_reached = (
+        getattr(response, "status", None) == "incomplete"
+        and incomplete_reason == "max_output_tokens"
+    )
+
+    if (
+        getattr(response, "status", None) == "incomplete"
+        and not output_token_limit_reached
+    ):
+        raise RuntimeError(
+            "일반 지식 답변 생성이 완료되지 않았습니다. "
+            f"incomplete_details={response.incomplete_details}"
+        )
+
     answer = (response.output_text or "").strip()
     if not answer:
         raise RuntimeError(
@@ -1835,6 +1992,29 @@ def request_general_knowledge_answer(
 
     if safety_instruction not in answer:
         answer = f"{safety_instruction}\n\n{answer}"
+
+    if output_token_limit_reached:
+        complete_boundaries = [
+            match.end()
+            for match in re.finditer(
+                r"[.!?。！？](?:[\"”’\)\]]*)?(?=\s|$)",
+                answer,
+            )
+        ]
+        last_line_break = answer.rfind("\n")
+        if last_line_break > 0:
+            complete_boundaries.append(last_line_break)
+
+        if complete_boundaries:
+            answer = answer[:max(complete_boundaries)].rstrip()
+        else:
+            answer = ""
+
+        answer = (
+            f"{answer}\n\n{GENERAL_KNOWLEDGE_CONTINUATION_NOTICE}"
+            if answer
+            else GENERAL_KNOWLEDGE_CONTINUATION_NOTICE
+        )
 
     return GeneratedAnswer(text=answer.strip(), cited_chunks=[])
 
