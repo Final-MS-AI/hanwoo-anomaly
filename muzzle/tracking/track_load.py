@@ -29,12 +29,15 @@ with pg.connect(os.getenv("DATABASE_URL")) as c:
         """, (cam, sess, tid, obs[0]["ts"], obs[-1]["ts"], len(obs),
               obs[0].get("source_video"))).fetchone()[0]
 
+        # behavior 는 이상행동 파트 파이프라인에서만 채워진다. 없으면 NULL.
         c.cursor().executemany("""
             INSERT INTO public.track_observation
-              (segment_id, ts, frame_idx, bbox_x, bbox_y, bbox_w, bbox_h, conf)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+              (segment_id, ts, frame_idx, bbox_x, bbox_y, bbox_w, bbox_h, conf,
+               behavior, behavior_conf)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, [(seg_id, o["ts"], o["frame_idx"], o["bbox_x"], o["bbox_y"],
-               o["bbox_w"], o["bbox_h"], o["conf"]) for o in obs])
+               o["bbox_w"], o["bbox_h"], o["conf"],
+               o.get("behavior"), o.get("behavior_conf")) for o in obs])
 
         print(f"segment {seg_id}  camera={cam}  track={tid}  관측={len(obs)}")
     c.commit()
