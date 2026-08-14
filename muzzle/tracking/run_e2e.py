@@ -35,6 +35,7 @@ import requests
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import auto_bind as AB   # noqa: E402  identify() / call_bind() 재사용
+import zones as Z          # noqa: E402  초크포인트 구역
 
 API = os.getenv("MUZZLE_API_BASE", "http://127.0.0.1:8001/muzzle")
 GPU = os.getenv("GPU_VM", "azureuser@10.0.0.5")
@@ -110,8 +111,14 @@ def id_time(choke_video, frames, nid, t0):
     return t0 + timedelta(seconds=best["frame"] / fps), best, fps
 
 
-def pick_candidates(rows, spans, seg_map, camera, t_id, window, behavior):
-    """시간 정합 + 행동 정합. 둘 다 만족하는 트랙만 후보다."""
+def pick_candidates(rows, spans, seg_map, camera, t_id, window, behavior,
+                    zone=None, anchor="topright"):
+    """시간 정합 + 구역 정합. 모두 만족하는 트랙만 후보다.
+
+    구역 판정 기준점이 topright 인 것은 실측 결과다. 소는 몸을 급이대에
+    넣지 않고 고개만 넣으므로 bbox 아래(발)·중앙(몸통)은 구역 밖에 있다.
+    급이대가 화면에서 좌하→우상 사선이고 소가 그 아래에서 위를 향하므로
+    머리가 bbox 우상단에 온다. 카메라 배치가 다르면 --anchor 로 바꾼다."""
     w = timedelta(seconds=window)
     hits = {}
     for r in rows:
@@ -120,6 +127,9 @@ def pick_candidates(rows, spans, seg_map, camera, t_id, window, behavior):
         if not (t_id - w <= r["_ts"] <= t_id + w):
             continue
         if behavior and r.get("behavior") != behavior:
+            continue
+        if zone and not Z.hit(zone, r["bbox_x"], r["bbox_y"],
+                              r["bbox_w"], r["bbox_h"], anchor):
             continue
         hits[r["track_id"]] = hits.get(r["track_id"], 0) + 1
 
@@ -136,7 +146,7 @@ def pick_candidates(rows, spans, seg_map, camera, t_id, window, behavior):
         mark = ">>" if ok else ("~ " if alive else "  ")
         print(f"  {mark} seg {seg}  track {tid:>3}  "
               f"{lo.strftime('%H:%M:%S')}~{hi.strftime('%H:%M:%S')}  "
-              f"관측 {n:>4}  창내 {behavior or 'any'} {h:>3}프레임")
+              f"관측 {n:>4}  창내 적중 {h:>3}프레임")
     return cands
 
 
@@ -153,8 +163,13 @@ def main():
     ap.add_argument("--camera-wide", default="A")
     ap.add_argument("--window", type=float, default=2.0,
                     help="시간 정합 허용 오차(초)")
-    ap.add_argument("--require-behavior", default="feeding",
-                    help="후보 조건이 되는 행동. 빈 문자열이면 시간만으로 판단")
+    ap.add_argument("--require-behavior", default="",
+                    help="후보 조건이 되는 행동. 기본은 쓰지 않는다 — 행동 라벨은"
+                         " 남의 모델 출력이라 갱신되면 조용히 바뀐다")
+    ap.add_argument("--zone", default="top",
+                    help="zones.py 의 초크포인트 구역 이름. 빈 문자열이면 미사용")
+    ap.add_argument("--anchor", default="topright",
+                    help="구역 판정 기준점: topright/top/bottom/center/touch")
     ap.add_argument("--stride", type=int, default=1)
     ap.add_argument("--max-frames", type=int, default=0)
     ap.add_argument("--topn", type=int, default=8)
@@ -175,7 +190,8 @@ def main():
     print(f"  전경 (GPU VM)    : {a.wide}")
     print(f"  초크포인트       : {a.choke}")
     print(f"  시간 정합 창     : +-{a.window}초")
-    print(f"  행동 정합 조건   : {a.require_behavior or '(없음 — 시간만)'}")
+    print(f"  구역 정합        : {a.zone or '(없음)'} · 기준점 {a.anchor}")
+    print(f"  행동 정합        : {a.require_behavior or '(없음)'}")
 
     if a.jsonl:
         head(1, "GPU VM 행동 추출 — 생략 (--jsonl 지정)")
@@ -215,9 +231,10 @@ def main():
     print(f"  B 확정 프레임 {best['frame']} @ {fps:.1f}fps → 확정 시각 {t_id.isoformat()}")
     print(f"  탐색 구간 {(t_id - timedelta(seconds=a.window)).strftime('%H:%M:%S.%f')[:-3]}"
           f" ~ {(t_id + timedelta(seconds=a.window)).strftime('%H:%M:%S.%f')[:-3]}")
-    print(f"  범례  >> 후보   ~ 시간만 일치({a.require_behavior} 없음)   (공백) 시간 불일치\n")
+    print("  범례  >> 후보   ~ 시간만 일치(구역 밖)   (공백) 시간 불일치\n")
     cands = pick_candidates(rows, spans, seg_map, a.camera_wide,
-                            t_id, a.window, a.require_behavior)
+                            t_id, a.window, a.require_behavior,
+                            a.zone or None, a.anchor)
     print(f"\n  후보 {len(cands)}건: {cands}")
 
     head(6, "판정")
@@ -227,11 +244,11 @@ def main():
         print(f"  POST /tracks/{cands[0]}/bind → HTTP {code}")
         print("  " + json.dumps(body, ensure_ascii=False, default=str))
     elif not cands:
-        print(f"  후보 0건 → 보류. 그 시각에 {a.require_behavior} 인 트랙이 없다.")
+        print("  후보 0건 → 보류. 그 시각 구역 안에 있던 트랙이 없다.")
         print("  기준 시각을 확인하거나 --window 를 늘릴 것.")
     else:
         print(f"  후보 {len(cands)}건 → 보류. 자동 바인딩하지 않는다.")
-        print("  둘 이상이 동시에 급이 중이면 시간·행동 정합으로 구분되지 않는다.")
+        print("  둘 이상이 동시에 급이대에 있으면 구역만으로는 구분되지 않는다.")
         print("  오배정이 미탐보다 나쁘므로 붙이지 않는 것이 옳다.")
 
     head(7, f"timeline 확인 — GET /cattle/{nid}/timeline")
