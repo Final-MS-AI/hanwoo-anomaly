@@ -177,7 +177,8 @@ def cattle_timeline(national_id: str,
 
         rows = c.execute(f"""
             SELECT ts, camera_id, segment_id, track_id, frame_idx,
-                   bbox_x, bbox_y, bbox_w, bbox_h, conf, similarity
+                   bbox_x, bbox_y, bbox_w, bbox_h, conf, similarity,
+                   behavior, behavior_conf
             FROM public.v_identified_track_observation
             WHERE {cond}
             ORDER BY ts
@@ -196,5 +197,6 @@ def cattle_timeline(national_id: str,
         "observations": [
             {"ts": r[0], "camera_id": r[1], "segment_id": r[2], "track_id": r[3],
              "frame_idx": r[4], "bbox": [r[5], r[6], r[7], r[8]],
-             "conf": r[9], "similarity": r[10]} for r in rows],
+             "conf": r[9], "similarity": r[10],
+             "behavior": r[11], "behavior_conf": r[12]} for r in rows],
     }
