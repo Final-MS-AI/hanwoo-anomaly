@@ -22,7 +22,11 @@ CREATE TABLE IF NOT EXISTS public.track_observation (
   ts         TIMESTAMPTZ NOT NULL,
   frame_idx  INT,
   bbox_x REAL, bbox_y REAL, bbox_w REAL, bbox_h REAL,
-  conf   REAL
+  conf   REAL,
+  -- 이상행동 파트 파이프라인(behavior_extract.py)에서만 채워진다.
+  -- 비문 전용 추적(track_extract.py)으로 들어온 행은 NULL 이다.
+  behavior      TEXT,
+  behavior_conf REAL
 );
 CREATE INDEX IF NOT EXISTS idx_track_obs_segment_ts
   ON public.track_observation (segment_id, ts);
@@ -47,7 +51,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_track_binding_active
 CREATE OR REPLACE VIEW public.v_identified_track_observation AS
 SELECT o.id, o.ts, o.frame_idx, o.bbox_x, o.bbox_y, o.bbox_w, o.bbox_h, o.conf,
        s.camera_id, s.track_id, s.session_id, s.id AS segment_id,
-       b.cattle_id, b.national_id, b.source, b.similarity
+       b.cattle_id, b.national_id, b.source, b.similarity,
+       -- 새 컬럼은 반드시 맨 뒤. CREATE OR REPLACE VIEW 는 컬럼 추가만
+       -- 허용하며 중간 삽입은 기존 컬럼의 이름 변경으로 해석돼 거부된다.
+       o.behavior, o.behavior_conf
 FROM       public.track_observation      o
 JOIN       public.track_segment          s ON s.id = o.segment_id
 LEFT JOIN  public.track_identity_binding b ON b.segment_id = s.id AND b.is_active;
