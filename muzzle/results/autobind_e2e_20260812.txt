@@ -1,0 +1,32 @@
+# 자동 바인딩 E2E 검증 — 2026-08-12
+# 영상 → 추적 적재 → 비문 식별 → 자동 바인딩 → 개체별 시계열
+
+## 1. 자동 바인딩
+
+영상 cow10_q1.mp4 | 채택 8장 | 운영 임계값 0.7
+------------------------------------------------------------------------
+frame   60 match 1.00 | 1위 000000000010 sim 0.8092 | ✅ 확정
+frame   56 match 0.90 | 1위 000000000010 sim 0.8414 | ✅ 확정
+frame   59 match 0.96 | 1위 000000000010 sim 0.8416 | ✅ 확정
+frame   58 match 0.93 | 1위 000000000010 sim 0.8399 | ✅ 확정
+frame   57 match 0.92 | 1위 000000000010 sim 0.8458 | ✅ 확정
+frame   55 match 0.89 | 1위 000000000010 sim 0.8564 | ✅ 확정
+frame   62 match 0.93 | 1위 000000000010 sim 0.8251 | ✅ 확정
+frame   52 match 0.86 | 1위 000000000010 sim 0.7789 | ✅ 확정
+------------------------------------------------------------------------
+최종 판정: 000000000010   (가중표 000000000010:6.64)
+bind 에 보낼 similarity: 0.8564   ← 승자의 최고 프레임 유사도
+
+POST /tracks/6/bind → HTTP 200
+{
+  "segment_id": 6,
+  "national_id": "000000000010",
+  "status": "already_bound",
+  "affected_observations": 19
+}
+
+## 2. timeline — 기본 (test_ 세션 제외)
+{"national_id":"000000000010","include_test":false,"segment_count":0,"observation_count":0,"truncated":false,"segments":[],"observations":[]}
+
+## 3. timeline — include_test=true
+{"national_id":"000000000010","include_test":true,"segment_count":1,"observation_count":19,"truncated":false,"segments":[{"segment_id":6,"camera_id":"A","track_id":1,"session_id":"test_20260812023011-e3eca6","started_at":"2026-08-12T02:30:11.082818+00:00","ended_at":"2026-08-12T02:30:14.249485+00:00","observations":19,"similarity":0.8564,"source":"muzzle"}],"observations":[{"ts":"2026-08-12T02:30:11.082818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":0,"bbox":[0.0,35.861206,1079.2949,1530.3281],"conf":0.8790989,"similarity":0.8564},{"ts":"2026-08-12T02:30:11.249485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":5,"bbox":[0.0,38.267483,1080.0,1549.6211],"conf":0.8513807,"similarity":0.8564},{"ts":"2026-08-12T02:30:11.416151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":10,"bbox":[0.0,41.37395,1080.0,1651.7009],"conf":0.841833,"similarity":0.8564},{"ts":"2026-08-12T02:30:11.582818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":15,"bbox":[0.0,42.282867,1080.0,1682.9966],"conf":0.77146375,"similarity":0.8564},{"ts":"2026-08-12T02:30:11.749485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":20,"bbox":[0.0,41.472923,1080.0,1676.9102],"conf":0.77862906,"similarity":0.8564},{"ts":"2026-08-12T02:30:11.916151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":25,"bbox":[0.0,25.091555,1080.0,1547.9099],"conf":0.87668586,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.082818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":30,"bbox":[0.0,31.37466,1080.0,1688.4154],"conf":0.83817285,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.249485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":35,"bbox":[0.0,31.524122,1080.0,1686.4723],"conf":0.7445573,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.416151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":40,"bbox":[17.718338,30.865215,1062.2816,1722.012],"conf":0.5996124,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.582818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":45,"bbox":[66.99208,54.68011,1013.00793,1667.3124],"conf":0.50308174,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.749485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":50,"bbox":[54.40772,103.16686,1025.5923,1731.8359],"conf":0.69195205,"similarity":0.8564},{"ts":"2026-08-12T02:30:12.916151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":55,"bbox":[39.62705,134.69637,1040.3729,1728.8839],"conf":0.6979052,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.082818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":60,"bbox":[69.65965,142.6157,1010.34033,1754.1508],"conf":0.860835,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.249485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":65,"bbox":[77.29548,130.30777,1002.7045,1778.7281],"conf":0.77355784,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.416151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":70,"bbox":[85.32051,147.66437,994.6795,1772.3357],"conf":0.67438525,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.582818+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":75,"bbox":[99.938484,176.18655,980.0615,1743.8135],"conf":0.6186652,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.749485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":80,"bbox":[62.03646,212.87437,1017.0756,1707.1256],"conf":0.8621879,"similarity":0.8564},{"ts":"2026-08-12T02:30:13.916151+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":85,"bbox":[129.70647,263.90518,950.2935,1656.0948],"conf":0.78511786,"similarity":0.8564},{"ts":"2026-08-12T02:30:14.249485+00:00","camera_id":"A","segment_id":6,"track_id":1,"frame_idx":95,"bbox":[161.22064,332.50348,918.77936,1587.4966],"conf":0.77561027,"similarity":0.8564}]}

@@ -11,8 +11,7 @@ const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const initialSensors = {
   temperature: null,
   humidity: null,
-  ammonia: null,
-  carbonDioxide: null,
+  airQuality: null,
 };
 
 const sensorDefinitions = [
@@ -35,22 +34,13 @@ const sensorDefinitions = [
     danger: 85,
   },
   {
-    key: "ammonia",
-    label: "암모니아",
-    unit: "ppm",
-    icon: "NH₃",
-    precision: 1,
-    warning: 20,
-    danger: 25,
-  },
-  {
-    key: "carbonDioxide",
-    label: "이산화탄소",
-    unit: "ppm",
-    icon: "CO₂",
+    key: "airQuality",
+    label: "공기질",
+    unit: "%",
+    icon: "AQ",
     precision: 0,
-    warning: 1500,
-    danger: 2500,
+    warning: 55,
+    danger: 75,
   },
 ];
 
@@ -166,10 +156,10 @@ function BarnEnvironmentControl() {
             data.sensors?.temperature ?? previous.temperature,
           humidity:
             data.sensors?.humidity ?? previous.humidity,
-          ammonia:
-            data.sensors?.ammonia ?? previous.ammonia,
-          carbonDioxide:
-            data.sensors?.carbonDioxide ?? previous.carbonDioxide,
+          airQuality:
+            data.sensors?.airQuality ??
+            data.sensors?.ammonia ??
+            previous.airQuality,
         }));
       } catch (error) {
         if (!isCancelled) {
@@ -210,9 +200,9 @@ function BarnEnvironmentControl() {
     if (mode !== "auto" || !device?.deviceId) return undefined;
 
     const recommendedLevel =
-      sensors.ammonia >= 25 || sensors.temperature >= 32
+      sensors.airQuality >= 75 || sensors.temperature >= 32
         ? 3
-        : sensors.ammonia >= 20 || sensors.temperature >= 28
+        : sensors.airQuality >= 55 || sensors.temperature >= 28
           ? 2
           : 1;
 
@@ -239,7 +229,7 @@ function BarnEnvironmentControl() {
     device?.deviceId,
     mode,
     sendControlCommand,
-    sensors.ammonia,
+    sensors.airQuality,
     sensors.temperature,
   ]);
 

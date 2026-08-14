@@ -200,6 +200,7 @@ def heartbeat(
 class TelemetryRequest(BaseModel):
     temperature: float | None = None
     humidity: float | None = None
+    airQuality: float | None = None
     ammonia: float | None = None
     carbonDioxide: float | None = None
 
@@ -260,7 +261,7 @@ def save_telemetry(
                     device_id,
                     body.temperature,
                     body.humidity,
-                    body.ammonia,
+                    body.airQuality if body.airQuality is not None else body.ammonia,
                     body.carbonDioxide,
                 ),
             )

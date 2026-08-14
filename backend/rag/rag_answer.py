@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from openai import AzureOpenAI, OpenAI
 
 ROOT = Path(__file__).resolve().parents[1]
+WEB_SERVICE_GUIDE_PATH = Path(__file__).with_name("web_service_guide.md")
 
 try:
     from .query_router import route_query
@@ -62,6 +63,11 @@ ANSWER_MODES = {
     },
 }
 
+GENERAL_KNOWLEDGE_CONTINUATION_NOTICE = (
+    "답변이 길어 여기까지만 표시했습니다. 추가 응답을 원하시면 "
+    "'이어서 설명해 주세요'라고 입력해 주세요."
+)
+
 
 @dataclass
 class RetrievedChunk:
@@ -91,6 +97,130 @@ class RetrievedChunk:
 class GeneratedAnswer:
     text: str
     cited_chunks: list[RetrievedChunk]
+
+
+WEB_SERVICE_KEYWORDS = (
+    "cowow",
+    "코와우",
+    "웹",
+    "앱",
+    "사이트",
+    "화면",
+    "페이지",
+    "메뉴",
+    "버튼",
+    "대시보드",
+    "이상 개체",
+    "주의 개체",
+    "위험 개체",
+    "영상 분석",
+    "영상 선택",
+    "소 등록",
+    "귀표 등록",
+    "귀표 이미지",
+    "귀표 사진",
+    "귀표 번호 인식",
+    "비문 등록",
+    "비문 사진",
+    "ai 상담",
+    "채팅",
+    "환경 제어",
+    "장비 등록",
+    "장비 연결",
+    "게스트 로그인",
+    "google 로그인",
+    "로그인 실패",
+    "ai 판단이 잘못",
+    "검토 요청",
+)
+
+WEB_SERVICE_SECTION_KEYWORDS = {
+    "로그인과 화면 이동": ("로그인", "게스트", "메뉴", "이동", "페이지"),
+    "이상 개체 대시보드와 AI 판단 피드백": (
+        "대시보드", "이상 개체", "주의", "위험", "ai 판단", "피드백", "검토 요청"
+    ),
+    "영상 분석 사용법": ("영상", "분석", "탐지", "추적", "진행률", "결과 영상"),
+    "소 등록과 귀표 OCR": (
+        "소 등록", "귀표", "ocr", "번호", "이미지", "사진", "인식", "판독"
+    ),
+    "비문 사진 등록": ("비문", "코 무늬", "일치도", "임베딩"),
+    "AI 상담 사용법": ("ai 상담", "채팅", "질문", "답변", "참고 문서", "이어서"),
+    "축사 환경 제어와 장비 연결": (
+        "환경", "장비", "esp32", "센서", "환기팬", "물 뿌리기", "등록 코드"
+    ),
+    "자주 발생하는 오류 대응": ("오류", "실패", "안 돼", "안돼", "문제", "재시도"),
+}
+
+
+def is_web_service_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    return any(keyword in normalized for keyword in WEB_SERVICE_KEYWORDS)
+
+
+def _load_web_service_sections() -> list[tuple[str, str]]:
+    if not WEB_SERVICE_GUIDE_PATH.exists():
+        raise FileNotFoundError(
+            f"웹 서비스 가이드 파일을 찾을 수 없습니다: {WEB_SERVICE_GUIDE_PATH}"
+        )
+
+    sections: list[tuple[str, str]] = []
+    title: str | None = None
+    lines: list[str] = []
+
+    for line in WEB_SERVICE_GUIDE_PATH.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            if title and lines:
+                sections.append((title, "\n".join(lines).strip()))
+            title = line[3:].strip()
+            lines = []
+        elif title:
+            lines.append(line)
+
+    if title and lines:
+        sections.append((title, "\n".join(lines).strip()))
+
+    return sections
+
+
+def retrieve_web_service_guide(
+    query: str,
+    max_chunks: int,
+) -> tuple[dict[str, Any], list[RetrievedChunk]]:
+    normalized_query = normalize_text(query)
+    query_tokens = content_fingerprint(normalized_query)
+    ranked: list[tuple[int, int, str, str]] = []
+
+    for index, (title, content) in enumerate(_load_web_service_sections()):
+        keywords = WEB_SERVICE_SECTION_KEYWORDS.get(title, ())
+        keyword_score = sum(
+            3 for keyword in keywords if normalize_text(keyword) in normalized_query
+        )
+        section_tokens = content_fingerprint(f"{title} {content}")
+        overlap_score = len(query_tokens & section_tokens)
+        ranked.append((keyword_score + overlap_score, -index, title, content))
+
+    ranked.sort(reverse=True)
+    selected = ranked[:max_chunks]
+    chunks = [
+        RetrievedChunk(
+            id=f"cowow-service-guide-{index + 1}",
+            document_title="COWOW 웹 서비스 사용 가이드",
+            document_type="service_guide",
+            page_start=None,
+            page_end=None,
+            section_path=title,
+            content=content,
+            score=5.0,
+            reranker_score=5.0,
+        )
+        for index, (_, _, title, content) in enumerate(selected)
+    ]
+
+    return (
+        {"route": "service_guide", "filter": None, "top_k": max_chunks},
+        chunks,
+    )
+
 
 def require_env(name: str) -> str:
     value = os.getenv(name)
@@ -417,6 +547,36 @@ BIOSECURITY_GENERAL_NOTICE = (
     "수의사의 지시를 우선해 주세요."
 )
 
+REALTIME_WEATHER_UNAVAILABLE_ANSWER = (
+    "현재 COWOW AI 상담에서는 실시간 날씨를 조회할 수 없습니다. "
+    "정확한 기온·강수·미세먼지 정보는 기상청 날씨누리나 "
+    "사용 중인 날씨 앱에서 확인해 주세요."
+)
+
+
+def is_realtime_weather_question(query: str) -> bool:
+    normalized = normalize_text(query)
+    weather_keywords = (
+        "날씨", "기온", "강수", "강수량", "비가", "눈이",
+        "미세먼지", "초미세먼지", "체감온도", "풍속", "기상 예보",
+    )
+    realtime_markers = (
+        "오늘", "내일", "모레", "지금", "현재", "실시간",
+        "이번 주", "이번주", "주말", "최신", "예보",
+    )
+    direct_weather_requests = (
+        "날씨 알려", "날씨가 어때", "날씨는 어때", "날씨 어떤",
+        "기온 알려", "몇 도", "비 오", "눈 오",
+    )
+
+    has_weather_keyword = any(
+        keyword in normalized for keyword in weather_keywords
+    )
+    return has_weather_keyword and (
+        any(marker in normalized for marker in realtime_markers)
+        or any(pattern in normalized for pattern in direct_weather_requests)
+    )
+
 
 def is_legal_or_support_question(query: str) -> bool:
     normalized = normalize_text(query)
@@ -645,6 +805,25 @@ def rewrite_query(
     if len(rewritten) > 500:
         return fallback_query
 
+    previous_web_service_context = any(
+        message["role"] == "user"
+        and is_web_service_question(message["content"])
+        for message in normalize_conversation(
+            messages,
+            max_messages=4,
+            max_chars=2000,
+        )
+    )
+
+    # 짧은 후속 질문을 재작성하면서 귀표 등록 등 서비스 맥락이 빠지면
+    # 로컬 사용 가이드 대신 무관한 외부 문서를 검색하게 된다. 이 경우에는
+    # 이전 사용자 질문을 보존하는 deterministic fallback을 사용한다.
+    if (
+        previous_web_service_context
+        and not is_web_service_question(rewritten)
+    ):
+        return fallback_query
+
     return rewritten
 
 def build_clients() -> tuple[SearchClient, AzureOpenAI, OpenAI]:
@@ -689,8 +868,15 @@ def retrieve(
     aoai: AzureOpenAI,
     mode: str,
 ) -> tuple[dict[str, Any], list[RetrievedChunk]]:
-    route = dict(route_query(query))
     config = ANSWER_MODES[mode]
+
+    if is_web_service_question(query):
+        return retrieve_web_service_guide(
+            query=query,
+            max_chunks=config["max_context_chunks"],
+        )
+
+    route = dict(route_query(query))
 
     if is_support_eligibility_question(query):
         route["route"] = "support_eligibility"
@@ -1115,11 +1301,11 @@ def clean_generated_text(text: str) -> str:
         text,
     )
 
-    # 답변 마지막에 독립적으로 남은 인용 제거
-    # 예: 지원 가능[1]. [2] -> 지원 가능[1].
+    # 문단 끝에서 문장 없이 분리된 인용은 하나의 인용 그룹으로 합친다.
+    # 예: 다시 시도하세요[1]. [2] -> 다시 시도하세요[1][2].
     text = re.sub(
-        r"(\[\d+\])\.\s+\[\d+\]\s*$",
-        r"\1.",
+        r"((?:\[\d+\])+)\.\s*((?:\[\d+\])+)(?=\s*(?:\n|$))",
+        r"\1\2.",
         text,
     )
 
@@ -1659,6 +1845,22 @@ def clean_generated_text(text: str) -> str:
 
     return text.strip()
 
+
+def clean_service_guide_text(text: str) -> str:
+    """웹 사용 가이드 답변에만 적용하는 간결한 형식 정리."""
+    text = re.sub(
+        r"(?m)^\s*추가\s*설명(?:\s*\([^)]*\))?\s*:?\s*$",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"(?m)^\s*\)\s*:?\s*$",
+        "",
+        text,
+    )
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
+
 def remove_generated_sources(answer: str) -> str:
     """모델이 임의로 생성한 출처 영역을 제거한다."""
     answer = re.split(
@@ -1696,6 +1898,17 @@ def resolve_cited_sources(
     max_sources: int,
 ) -> GeneratedAnswer:
     answer = remove_generated_sources(answer)
+
+    # The model can occasionally echo a bracketed chunk ID even though the
+    # prompt asks for numeric citations. Convert only IDs from the supplied
+    # context so internal identifiers never leak into the user-facing answer.
+    for number, chunk in enumerate(chunks, start=1):
+        answer = re.sub(
+            rf"\[\s*{re.escape(chunk.id)}\s*\]",
+            f"[{number}]",
+            answer,
+        )
+
     answer = deduplicate_citation_groups(answer)
 
     cited_numbers: list[int] = []
@@ -1818,6 +2031,26 @@ def request_general_knowledge_answer(
         reasoning={"effort": "minimal"},
         max_output_tokens=ANSWER_MODES[mode]["max_output_tokens"],
     )
+    incomplete_details = getattr(response, "incomplete_details", None)
+    incomplete_reason = (
+        incomplete_details.get("reason")
+        if isinstance(incomplete_details, dict)
+        else getattr(incomplete_details, "reason", None)
+    )
+    output_token_limit_reached = (
+        getattr(response, "status", None) == "incomplete"
+        and incomplete_reason == "max_output_tokens"
+    )
+
+    if (
+        getattr(response, "status", None) == "incomplete"
+        and not output_token_limit_reached
+    ):
+        raise RuntimeError(
+            "일반 지식 답변 생성이 완료되지 않았습니다. "
+            f"incomplete_details={response.incomplete_details}"
+        )
+
     answer = (response.output_text or "").strip()
     if not answer:
         raise RuntimeError(
@@ -1835,6 +2068,29 @@ def request_general_knowledge_answer(
 
     if safety_instruction not in answer:
         answer = f"{safety_instruction}\n\n{answer}"
+
+    if output_token_limit_reached:
+        complete_boundaries = [
+            match.end()
+            for match in re.finditer(
+                r"[.!?。！？](?:[\"”’\)\]]*)?(?=\s|$)",
+                answer,
+            )
+        ]
+        last_line_break = answer.rfind("\n")
+        if last_line_break > 0:
+            complete_boundaries.append(last_line_break)
+
+        if complete_boundaries:
+            answer = answer[:max(complete_boundaries)].rstrip()
+        else:
+            answer = ""
+
+        answer = (
+            f"{answer}\n\n{GENERAL_KNOWLEDGE_CONTINUATION_NOTICE}"
+            if answer
+            else GENERAL_KNOWLEDGE_CONTINUATION_NOTICE
+        )
 
     return GeneratedAnswer(text=answer.strip(), cited_chunks=[])
 
@@ -2484,6 +2740,29 @@ def build_fmd_post_report_action_answer(
             cited_chunks=cited_chunks[:2],
         )
 
+    is_farm_exit_question = any(
+        keyword in normalized_query
+        for keyword in (
+            "농장을 나가",
+            "농장 밖으로 나가",
+            "농장을 떠나",
+            "농장 밖에 나가",
+            "외출해도 되",
+            "외출해도 되나요",
+        )
+    )
+
+    if is_farm_exit_question:
+        text = (
+            f"방역기관이 별도로 허용하기 전에는 농장을 임의로 떠나지 말고, "
+            f"농장 안에서 연락 가능한 상태로 대기해야 합니다{citation_1}."
+        )
+
+        return GeneratedAnswer(
+            text=text,
+            cited_chunks=cited_chunks[:1],
+        )
+
     is_wait_duration_question = any(
         keyword in normalized_query
         for keyword in (
@@ -2636,6 +2915,12 @@ def generate_answer(
     messages: list[dict[str, str]] | None = None,
     search_query: str | None = None,
 ) -> GeneratedAnswer:
+    if is_realtime_weather_question(query):
+        return GeneratedAnswer(
+            text=REALTIME_WEATHER_UNAVAILABLE_ANSWER,
+            cited_chunks=[],
+        )
+
     if not chunks:
         return request_general_knowledge_answer(
             response_client=response_client,
@@ -2676,6 +2961,11 @@ def generate_answer(
             chunks=chunks,
         )
 
+    service_guide_answer = bool(chunks) and all(
+        chunk.document_type == "service_guide"
+        for chunk in chunks
+    )
+
     context = build_context(chunks)
 
     conversation_text = build_conversation_text(
@@ -2702,6 +2992,17 @@ def generate_answer(
     input_parts.append(
         f"검색 근거:\n{context}"
     )
+
+    if service_guide_answer:
+        input_parts.append(
+            "현재 질문은 COWOW 웹 서비스 사용법에 관한 질문입니다. "
+            "사용자가 바로 실행할 핵심 조치를 먼저 답하고, 같은 내용을 "
+            "요약과 추가 설명으로 반복하지 마세요. "
+            "답변은 제목 없이 최대 5문장으로 간결하게 작성하세요. "
+            "목록이 꼭 필요한 절차만 최대 3개 항목으로 작성하세요. "
+            "'추가 설명', '직접 답변', '요약' 같은 메타 제목을 작성하지 마세요. "
+            "인용 번호만 따로 문장처럼 출력하지 말고 관련 문장 끝에 붙이세요."
+        )
 
     
 
@@ -3011,6 +3312,9 @@ def generate_answer(
         answer = ensure_mixed_answer_notice(answer, query)
 
     answer = clean_generated_text(answer)
+
+    if service_guide_answer:
+        answer = clean_service_guide_text(answer)
 
     return resolve_cited_sources(
         answer=answer,

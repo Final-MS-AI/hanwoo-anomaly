@@ -927,7 +927,7 @@
   flex-direction: column;
   width: min(760px, calc(100% - 48px));
   min-width: 0;
-  min-height: 620px;
+  min-height: 700px;
   margin: 28px auto 24px;
   padding: 24px;
   background: #fff;
@@ -992,6 +992,11 @@
   overflow-x: hidden;
   overflow-y: auto;
   box-sizing: border-box;
+}
+
+.rag-message-list.initial {
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .rag-message {
@@ -1091,27 +1096,101 @@
   to { opacity: 0.25; transform: translateY(-3px); }
 }
 
-.rag-suggestions {
-  display: flex;
-  gap: 8px;
+.rag-suggestion-panel {
   padding-bottom: 14px;
-  overflow-x: auto;
-  scrollbar-width: none;
 }
 
-.rag-suggestions::-webkit-scrollbar {
-  display: none;
+.rag-suggestions-title {
+  margin: 0 0 8px;
+  color: #806b56;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.rag-suggestion-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.rag-suggestion-tabs button {
+  min-height: 32px;
+  padding: 6px 12px;
+  color: #806b56;
+  background: #f7f3ed;
+  border: 1px solid #e4dacf;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.rag-suggestion-tabs button:hover {
+  background: #fff5e8;
+  border-color: #c8ad91;
+}
+
+.rag-suggestion-tabs button.active {
+  color: #fff;
+  background: #2f7042;
+  border-color: #2f7042;
+}
+
+.rag-suggestion-tabs button:focus-visible {
+  outline: 2px solid #2f7042;
+  outline-offset: 2px;
+}
+
+.rag-suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rag-suggestions button:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .rag-suggestions button {
-  min-height: 38px;
-  padding: 0 12px;
-  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  min-height: 48px;
+  padding: 10px 12px;
   color: #664d36;
   background: #fffaf3;
   border: 1px solid #d9c7b3;
-  border-radius: 999px;
+  border-radius: 12px;
+  font: inherit;
+  line-height: 1.35;
+  text-align: left;
   cursor: pointer;
+}
+
+.rag-suggestions button:hover {
+  background: #fff5e8;
+  border-color: #c8ad91;
+}
+
+.rag-suggestions button:focus-visible {
+  outline: 2px solid #2f7042;
+  outline-offset: 2px;
+}
+
+.rag-suggestions button span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.rag-suggestions button i {
+  flex: 0 0 auto;
+  color: #2f7042;
+  font-style: normal;
 }
 
 .rag-chat-form {
@@ -1124,6 +1203,10 @@
   border: 1px solid #e4dacf;
   border-radius: 15px;
   box-sizing: border-box;
+}
+
+.rag-chat-page.initial .rag-chat-form {
+  margin-top: auto;
 }
 
 .rag-chat-form textarea {
@@ -1516,8 +1599,39 @@
     margin-left: 12px;
   }
 
-  .rag-suggestions {
+  .rag-suggestion-panel {
     padding-bottom: 10px;
+  }
+
+  .rag-suggestion-tabs {
+    overflow-x: auto;
+    padding: 1px 1px 3px;
+    scrollbar-width: none;
+  }
+
+  .rag-suggestion-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rag-suggestions {
+    grid-template-columns: none;
+    grid-template-rows: repeat(2, auto);
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(240px, 86%);
+    overflow-x: auto;
+    padding: 2px 2px 8px;
+    scroll-snap-type: x proximity;
+    scrollbar-width: none;
+  }
+
+  .rag-suggestions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .rag-suggestions button,
+  .rag-suggestions button:last-child:nth-child(odd) {
+    grid-column: auto;
+    scroll-snap-align: start;
   }
 
   .rag-suggestions button {

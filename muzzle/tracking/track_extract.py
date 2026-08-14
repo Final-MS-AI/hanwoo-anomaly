@@ -18,6 +18,12 @@ p.add_argument("--classes", default="19", help="COCO cow=19. 전체는 빈 문�
 p.add_argument("--conf", type=float, default=0.25)
 p.add_argument("--stride", type=int, default=5)
 p.add_argument("--max-frames", type=int, default=120)
+p.add_argument("--session", default=None,
+               help="세션 ID 직접 지정")
+p.add_argument("--session-prefix", default="",
+               help="자동 생성 세션 ID 앞에 붙일 접두어. test_ 는 timeline 기본 응답에서 제외된다")
+p.add_argument("--start-time", default=None,
+               help="영상 0프레임의 기준 시각 (ISO8601). 카메라 간 핸드오프를 하려면\n                     두 영상에 같은 값을 줘야 한다. 미지정 시 실행 시각")
 a = p.parse_args()
 
 classes = [int(x) for x in a.classes.split(",")] if a.classes.strip() else None
@@ -26,8 +32,13 @@ cap = cv2.VideoCapture(a.video)
 fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 cap.release()
 
-session_id = datetime.now().strftime("%Y%m%d%H%M%S") + "-" + uuid.uuid4().hex[:6]
-base = datetime.now(timezone.utc)
+session_id = a.session or (a.session_prefix
+                           + datetime.now().strftime("%Y%m%d%H%M%S")
+                           + "-" + uuid.uuid4().hex[:6])
+base = (datetime.fromisoformat(a.start_time)
+        if a.start_time else datetime.now(timezone.utc))
+if base.tzinfo is None:
+    base = base.replace(tzinfo=timezone.utc)
 
 model = YOLO(a.weights)
 kept = written = 0

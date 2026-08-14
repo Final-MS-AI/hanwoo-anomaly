@@ -6,27 +6,52 @@ from rag.rag_answer import RetrievedChunk, generate_answer
 
 
 class FakeResponses:
-    def __init__(self, output_text: str | list[str]):
+    def __init__(
+        self,
+        output_text: str | list[str],
+        statuses: list[str] | None = None,
+        incomplete_reasons: list[str | None] | None = None,
+    ):
         self.output_texts = (
             list(output_text)
             if isinstance(output_text, list)
             else [output_text]
+        )
+        response_count = len(self.output_texts)
+        self.statuses = statuses or ["completed"] * response_count
+        self.incomplete_reasons = (
+            incomplete_reasons or [None] * response_count
         )
         self.calls = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
         output_text = self.output_texts.pop(0)
+        status = self.statuses.pop(0)
+        incomplete_reason = self.incomplete_reasons.pop(0)
         return SimpleNamespace(
             output_text=output_text,
-            status="completed",
-            incomplete_details=None,
+            status=status,
+            incomplete_details=(
+                SimpleNamespace(reason=incomplete_reason)
+                if incomplete_reason
+                else None
+            ),
         )
 
 
 class FakeClient:
-    def __init__(self, output_text: str | list[str]):
-        self.responses = FakeResponses(output_text)
+    def __init__(
+        self,
+        output_text: str | list[str],
+        statuses: list[str] | None = None,
+        incomplete_reasons: list[str | None] | None = None,
+    ):
+        self.responses = FakeResponses(
+            output_text,
+            statuses=statuses,
+            incomplete_reasons=incomplete_reasons,
+        )
 
 
 def chunk(
@@ -61,6 +86,67 @@ def test_complete_ood_uses_general_knowledge_without_fake_citations(monkeypatch)
     assert "sorted()" in result.text
     assert "[1]" not in result.text
     assert result.cited_chunks == []
+
+
+def test_realtime_weather_question_returns_short_fixed_guidance(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
+    client = FakeClient("호출되면 안 되는 모델 응답입니다.")
+
+    result = generate_answer(
+        query="오늘 서울 날씨는 어떤가요?",
+        chunks=[],
+        response_client=client,
+        mode="normal",
+    )
+
+    assert "실시간 날씨를 조회할 수 없습니다" in result.text
+    assert "기상청 날씨누리" in result.text
+    assert "일반적인 지식" not in result.text
+    assert result.cited_chunks == []
+    assert client.responses.calls == []
+
+
+def test_livestock_management_in_hot_weather_uses_normal_fallback(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
+    client = FakeClient("그늘과 충분한 물을 제공하세요.")
+
+    result = generate_answer(
+        query="더운 날씨에 소를 어떻게 관리하나요?",
+        chunks=[],
+        response_client=client,
+        mode="normal",
+    )
+
+    assert "그늘과 충분한 물" in result.text
+    assert len(client.responses.calls) == 1
+
+
+def test_ood_token_limit_ends_with_follow_up_guidance(monkeypatch):
+    monkeypatch.setenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "test-model")
+    client = FakeClient(
+        (
+            "첫 번째 확인 사항입니다.\n\n"
+            "마무리 안내\n"
+            "위 내용은 일반적 관찰·응"
+        ),
+        statuses=["incomplete"],
+        incomplete_reasons=["max_output_tokens"],
+    )
+
+    result = generate_answer(
+        query="장시간 누워 있는 소는 어떻게 확인하나요?",
+        chunks=[],
+        response_client=client,
+        mode="normal",
+    )
+
+    assert "첫 번째 확인 사항입니다." in result.text
+    assert "일반적 관찰·응" not in result.text
+    assert "추가 응답을 원하시면" in result.text
+    assert "이어서 설명해 주세요" in result.text
+    assert result.cited_chunks == []
+    assert len(client.responses.calls) == 1
+    assert client.responses.calls[0]["max_output_tokens"] == 1200
 
 
 def test_out_of_document_livestock_question_has_health_warning(monkeypatch):

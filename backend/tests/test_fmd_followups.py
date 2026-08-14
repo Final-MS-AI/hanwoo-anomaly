@@ -26,6 +26,21 @@ COMMON_MESSAGES = [
 
 TEST_CASES: list[dict[str, Any]] = [
     {
+        "name": "신고 후 농장 외출",
+        "question": "신고 후 농장을 나가도 되나요?",
+        "required": [
+            "농장을 임의로 떠나지",
+            "연락 가능한 상태",
+        ],
+        "forbidden": [
+            "1588-4060",
+            "1588-9060",
+            "가축·분뇨·장비·물품",
+            "필요한 소독",
+        ],
+        "max_sources": 1,
+    },
+    {
         "name": "일반 후속 행동",
         "question": "그다음에는 무엇을 해야 하나요?",
         "required": [

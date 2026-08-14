@@ -23,3 +23,7 @@ crops/
 
 # Backend local environment
 backend/.env
+
+# 파이썬 캐시
+__pycache__/
+*.pyc
