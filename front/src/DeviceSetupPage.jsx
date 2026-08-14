@@ -4,10 +4,22 @@ import { useNavigate } from "react-router-dom";
 const API_BASE_URL =
   import.meta.env.VITE_DEVICE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  "";
+  "https://hanwoo.koreacentral.cloudapp.azure.com";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const SHOULD_USE_DEVICE_API = import.meta.env.PROD || Boolean(API_BASE_URL);
 const PUBLIC_DEVICE_NUMBER = "COWOW-0001";
+
+async function readApiResponse(response) {
+  const text = await response.text();
+
+  if (!text) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
+}
 
 function DeviceSetupPage({ user }) {
   const navigate = useNavigate();
@@ -70,11 +82,13 @@ function DeviceSetupPage({ user }) {
           body: JSON.stringify({ deviceId: normalizedDeviceNumber }),
         },
       );
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
         throw new Error(
-          data.detail ?? data.message ?? "등록 코드 발송에 실패했습니다.",
+          data.detail ??
+            data.message ??
+            `등록 코드 발송에 실패했습니다. (HTTP ${response.status})`,
         );
       }
 
@@ -131,7 +145,7 @@ function DeviceSetupPage({ user }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        const data = await response.json();
+        const data = await readApiResponse(response);
 
         if (!response.ok) {
           throw new Error(
@@ -178,7 +192,7 @@ function DeviceSetupPage({ user }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ shareCode: shareCode.trim() }),
       });
-      const data = await response.json();
+      const data = await readApiResponse(response);
 
       if (!response.ok) {
         throw new Error(data.detail ?? "가족 공유 장비 연결에 실패했습니다.");
@@ -205,16 +219,16 @@ function DeviceSetupPage({ user }) {
     <section className="device-setup-page">
       <div className="device-setup-header">
         <span>최초 1회 설정</span>
-        <h2>축사 장비 연결</h2>
-        <p>장비 번호를 확인하고 이메일로 받은 일회용 코드를 입력해 연결합니다.</p>
+        <h2>축사 환경 시스템 연결</h2>
+        <p>대표 시스템 번호 하나로 센서, 로컬 분석 서버와 CCTV 스트림을 연결합니다.</p>
       </div>
 
       <div className="device-network-flow" aria-label="원격 연결 흐름">
-        <div><strong>ESP32</strong><span>축사 장비</span></div>
+        <div><strong>환경 시스템</strong><span>센서·제어</span></div>
         <b>→</b>
         <div><strong>핫스팟</strong><span>2.4GHz</span></div>
         <b>→</b>
-        <div><strong>서버</strong><span>HTTPS API</span></div>
+        <div><strong>분석 서버</strong><span>RTSP·HTTPS</span></div>
         <b>→</b>
         <div><strong>웹·앱</strong><span>원격 제어</span></div>
       </div>
@@ -222,7 +236,7 @@ function DeviceSetupPage({ user }) {
       <ol className="device-setup-steps">
         <li>
           <span>1</span>
-          <div><strong>장비 번호 확인</strong><p>장비 본체 또는 포장지에 적힌 COWOW 번호를 확인합니다.</p></div>
+          <div><strong>시스템 번호 확인</strong><p>설치 안내서에 적힌 COWOW 환경 시스템 번호를 확인합니다.</p></div>
         </li>
         <li>
           <span>2</span>
@@ -233,7 +247,7 @@ function DeviceSetupPage({ user }) {
         </li>
         <li>
           <span>3</span>
-          <div><strong>장비 연결</strong><p>등록 코드와 설치 축사를 확인한 후 제어를 시작합니다.</p></div>
+          <div><strong>환경 시스템 연결</strong><p>센서 제어와 CCTV 분석 스트림을 한 번에 연결합니다.</p></div>
         </li>
       </ol>
 
@@ -249,7 +263,7 @@ function DeviceSetupPage({ user }) {
               setMessage("");
             }}
           >
-            내 장비 등록
+            내 환경 시스템 등록
           </button>
           <button
             className={setupMode === "share" ? "active" : ""}
@@ -295,7 +309,7 @@ function DeviceSetupPage({ user }) {
       ) : (
       <form className="device-claim-form" onSubmit={registerDevice}>
         <label>
-          <span>장비 번호</span>
+          <span>환경 시스템 번호</span>
           <input
             value={deviceNumber}
             readOnly={isGuest}
@@ -355,13 +369,13 @@ function DeviceSetupPage({ user }) {
             ? "등록 확인 중..."
             : isGuest
               ? "게스트 장비 연결"
-              : "장비 연결하고 제어 시작"}
+              : "환경 시스템 연결하고 시작"}
         </button>
       </form>
       )}
 
       <p className="device-setup-note">
-        장비 번호는 장비를 구분하고, 일회용 코드는 해당 장비의 등록 권한을 확인하는 데 사용됩니다.
+        시스템 번호는 같은 축사의 센서, 로컬 분석 서버와 CCTV를 묶고 일회용 코드는 등록 권한을 확인합니다.
       </p>
     </section>
   );

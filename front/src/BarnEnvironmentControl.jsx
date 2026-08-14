@@ -7,6 +7,24 @@ const CONTROL_API_URL =
   import.meta.env.VITE_API_BASE_URL ??
   "";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
+const COWOW_0001_LIVE_VIEW_URL =
+  import.meta.env.VITE_LIVE_VIEW_URL ??
+  "https://hanwoo2.koreacentral.cloudapp.azure.com/top/raw";
+
+function getLiveViewUrl(device) {
+  if (!device) return "";
+  if (device.liveViewUrl) return device.liveViewUrl;
+
+  const systemNumber = String(
+    device.publicDeviceNumber ?? device.systemId ?? "",
+  ).toUpperCase();
+
+  if (systemNumber === "COWOW-0001" || systemNumber === "GUEST") {
+    return COWOW_0001_LIVE_VIEW_URL;
+  }
+
+  return "";
+}
 
 const initialSensors = {
   temperature: null,
@@ -70,6 +88,7 @@ function BarnEnvironmentControl() {
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState("");
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
+  const [activeSystemTab, setActiveSystemTab] = useState("environment");
   const sprayTimerRef = useRef(null);
 
   const sensorCards = useMemo(
@@ -86,6 +105,7 @@ function BarnEnvironmentControl() {
     (sensor) =>
       sensor.level === "warning" || sensor.level === "danger",
   );
+  const liveViewUrl = getLiveViewUrl(device);
   const lastSeenLabel = lastSeenAt
     ? new Date(lastSeenAt).toLocaleTimeString("ko-KR", {
         hour: "2-digit",
@@ -310,8 +330,8 @@ function BarnEnvironmentControl() {
       <div className="environment-control-header">
         <div>
           <span className="environment-live"><i /> 실시간 환경</span>
-          <h2>축사 환경 제어</h2>
-          <p>센서 상태를 확인하고 환기·살수 장치를 제어합니다.</p>
+          <h2>축사 환경 시스템</h2>
+          <p>환경 센서, 제어 장치와 CCTV 분석 스트림을 한 곳에서 확인합니다.</p>
         </div>
         {device && (
           <div className="connection-action-area">
@@ -336,11 +356,11 @@ function BarnEnvironmentControl() {
         <div className="remote-connection-main">
           <span className="remote-connection-icon">{device ? "⌁" : "+"}</span>
           <div>
-            <strong>{device ? device.deviceName ?? device.deviceId : "ESP32 게이트웨이를 등록해 주세요"}</strong>
+            <strong>{device ? "COWOW 축사 환경 시스템" : "축사 환경 시스템을 등록해 주세요"}</strong>
             <p>
               {device
-                ? `ESP32 → ${device.networkName || "핫스팟"} → HTTPS 서버 → 현재 기기`
-                : "최초 한 번 등록하면 모바일 데이터에서도 원격 제어할 수 있습니다."}
+                ? `환경 센서 · 로컬 분석 서버 · CCTV 스트림 → COWOW 클라우드`
+                : "최초 한 번 등록하면 센서 제어와 영상 분석 결과를 함께 사용할 수 있습니다."}
             </p>
           </div>
         </div>
@@ -351,11 +371,34 @@ function BarnEnvironmentControl() {
               <small>마지막 통신 {lastSeenLabel}</small>
             </>
           ) : (
-            <button type="button" onClick={() => navigate("/devices/setup")}>장비 등록하기</button>
+            <button type="button" onClick={() => navigate("/devices/setup")}>환경 시스템 연결</button>
           )}
         </div>
       </div>
 
+      <div className="environment-system-tabs" role="tablist" aria-label="축사 환경 시스템 보기">
+        <button
+          className={activeSystemTab === "environment" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={activeSystemTab === "environment"}
+          onClick={() => setActiveSystemTab("environment")}
+        >
+          환경 센서·제어
+        </button>
+        <button
+          className={activeSystemTab === "live" ? "active" : ""}
+          type="button"
+          role="tab"
+          aria-selected={activeSystemTab === "live"}
+          onClick={() => setActiveSystemTab("live")}
+        >
+          실시간 CCTV
+        </button>
+      </div>
+
+      {activeSystemTab === "environment" ? (
+        <>
       <DeviceSharingPanel device={device} />
 
       <div className="sensor-grid">
@@ -487,6 +530,36 @@ function BarnEnvironmentControl() {
           <strong>{controlMessage}</strong>
         </div>
       </div>
+        </>
+      ) : (
+        <section className="live-cctv-panel" aria-label="실시간 CCTV 화면">
+          <div className="live-cctv-header">
+            <div>
+              <span>CAMERA-01</span>
+              <h3>1번 축사 실시간 화면</h3>
+            </div>
+            <strong><i /> {liveViewUrl ? "스트림 연결" : "시스템 미연결"}</strong>
+          </div>
+
+          {liveViewUrl ? (
+            <img
+              className="live-cctv-frame"
+              src={liveViewUrl}
+              alt="1번 축사 실시간 CCTV"
+            />
+          ) : (
+            <div className="live-cctv-placeholder">
+              <span>▶</span>
+              <strong>{device ? "RTSP 웹 스트림을 준비하고 있습니다." : "축사 환경 시스템을 먼저 연결해 주세요."}</strong>
+              <p>영상 서버의 상단 CCTV 실시간 신호를 불러오면 이 화면에서 바로 표시됩니다.</p>
+            </div>
+          )}
+
+          <p className="live-cctv-note">
+            hanwoo2 서버의 상단 CCTV 원본 실시간 신호를 동일하게 표시합니다.
+          </p>
+        </section>
+      )}
     </section>
   );
 }

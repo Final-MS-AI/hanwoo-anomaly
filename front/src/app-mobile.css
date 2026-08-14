@@ -235,6 +235,126 @@
   cursor: pointer;
 }
 
+.environment-system-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0;
+  padding: 5px;
+  background: #f3f0eb;
+  border-radius: 12px;
+}
+
+.environment-system-tabs button {
+  min-height: 42px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  color: #75695e;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.environment-system-tabs button.active {
+  color: #fff;
+  background: #347448;
+  box-shadow: 0 4px 12px rgba(52, 116, 72, 0.18);
+}
+
+.live-cctv-panel {
+  padding: 18px;
+  border: 1px solid #e4ddd3;
+  border-radius: 16px;
+  background: #fbfaf8;
+}
+
+.live-cctv-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.live-cctv-header span {
+  color: #8a796a;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.live-cctv-header h3 {
+  margin: 4px 0 0;
+  color: #2b2118;
+  font-size: 16px;
+}
+
+.live-cctv-header > strong {
+  color: #347448;
+  font-size: 11px;
+}
+
+.live-cctv-header > strong i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: #43a45d;
+}
+
+.live-cctv-frame,
+.live-cctv-placeholder {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 13px;
+  background: #171b18;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.live-cctv-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px;
+  color: #fff;
+  text-align: center;
+}
+
+.live-cctv-frame {
+  display: block;
+  object-fit: contain;
+}
+
+.live-cctv-placeholder > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 18px;
+}
+
+.live-cctv-placeholder p {
+  max-width: 520px;
+  margin: 0;
+  color: #b9c1bc;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.live-cctv-note {
+  margin: 12px 2px 0;
+  color: #7c7064;
+  font-size: 10px;
+}
+
 .device-setup-page {
   width: min(760px, calc(100% - 48px));
   margin: 28px auto 24px;

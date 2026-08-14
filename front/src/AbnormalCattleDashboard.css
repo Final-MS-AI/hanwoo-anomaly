@@ -177,6 +177,45 @@
   gap: 10px;
 }
 
+.dashboard-load-error {
+  margin: -8px 0 20px;
+  padding: 12px 14px;
+  border: 1px solid #efc3bc;
+  border-radius: 10px;
+  background: #fff3f1;
+  color: #a83c2e;
+  font-size: 13px;
+}
+
+.dashboard-empty-state {
+  margin: 0;
+  padding: 24px 12px;
+  color: #81776d;
+  text-align: center;
+  font-size: 13px;
+}
+
+.dashboard-event-media {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.dashboard-event-media a {
+  padding: 7px 10px;
+  border: 1px solid #d8c6ad;
+  border-radius: 8px;
+  background: #fffaf2;
+  color: #70471e;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dashboard-event-media a:hover {
+  background: #f7ead7;
+}
+
 .abnormal-cattle-item {
   display: grid;
   grid-template-columns: minmax(120px, 0.8fr) minmax(150px, 1fr) auto;
