@@ -10,9 +10,6 @@ const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const COWOW_0001_LIVE_VIEW_URL =
   import.meta.env.VITE_LIVE_VIEW_URL ??
   "https://hanwoo2.koreacentral.cloudapp.azure.com/top/raw";
-const COWOW_IDENTITY_DEMO_URL =
-  import.meta.env.VITE_IDENTITY_DEMO_URL ??
-  "https://hanwoo2.koreacentral.cloudapp.azure.com/identity/demo";
 
 function getLiveViewUrl(device) {
   if (!device) return "";
@@ -398,15 +395,6 @@ function BarnEnvironmentControl() {
         >
           실시간 CCTV
         </button>
-        <button
-          className={activeSystemTab === "identity" ? "active" : ""}
-          type="button"
-          role="tab"
-          aria-selected={activeSystemTab === "identity"}
-          onClick={() => setActiveSystemTab("identity")}
-        >
-          비문·귀표 분석
-        </button>
       </div>
 
       {activeSystemTab === "environment" ? (
@@ -543,7 +531,7 @@ function BarnEnvironmentControl() {
         </div>
       </div>
         </>
-      ) : activeSystemTab === "live" ? (
+      ) : (
         <section className="live-cctv-panel" aria-label="실시간 CCTV 화면">
           <div className="live-cctv-header">
             <div>
@@ -569,35 +557,6 @@ function BarnEnvironmentControl() {
 
           <p className="live-cctv-note">
             hanwoo2 서버의 상단 CCTV 원본 실시간 신호를 동일하게 표시합니다.
-          </p>
-        </section>
-      ) : (
-        <section className="live-cctv-panel" aria-label="비문 및 귀표 OCR 분석 화면">
-          <div className="live-cctv-header">
-            <div>
-              <span>IDENTITY DEMO</span>
-              <h3>반복 영상 개체 식별</h3>
-            </div>
-            <strong><i /> {device ? "GPU 모델 연결" : "시스템 미연결"}</strong>
-          </div>
-
-          {device ? (
-            <iframe
-              className="identity-analysis-frame"
-              src={COWOW_IDENTITY_DEMO_URL}
-              title="비문 및 귀표 OCR 반복 영상 분석"
-              allow="autoplay; fullscreen"
-            />
-          ) : (
-            <div className="live-cctv-placeholder">
-              <span>◎</span>
-              <strong>축사 환경 시스템을 먼저 연결해 주세요.</strong>
-              <p>등록된 COWOW 시스템에서만 비문·귀표 OCR 분석 화면을 사용할 수 있습니다.</p>
-            </div>
-          )}
-
-          <p className="live-cctv-note">
-            cow-feeding02.mp4를 반복 재생하며 GPU 비문 모델과 귀표 OCR 모델을 동시에 실행합니다.
           </p>
         </section>
       )}
