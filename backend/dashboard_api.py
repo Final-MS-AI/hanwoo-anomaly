@@ -8,7 +8,7 @@ from auth_session import read_user_id
 
 
 router = APIRouter(
-    prefix="/dashboard",
+    prefix="/api/dashboard",
     tags=["Dashboard"],
 )
 
@@ -136,11 +136,15 @@ def get_dashboard(
                     )
                     SELECT
                         cattle_id,
-                        'COW-' || LPAD(
-                            cattle_id::text,
-                            3,
-                            '0'
-                        ) AS display_id,
+                        CASE
+    WHEN LEFT(national_id, 2) = '99'
+        THEN 'COW-' || RIGHT(national_id, 3)
+    ELSE 'COW-' || LPAD(
+        cattle_id::text,
+        3,
+        '0'
+    )
+END AS display_id,
                         national_id,
                         ear_tag_number,
                         anomaly_type,
@@ -171,11 +175,15 @@ def get_dashboard(
                     """
                     SELECT
                         c.id AS cattle_id,
-                        'COW-' || LPAD(
-                            c.id::text,
-                            3,
-                            '0'
-                        ) AS display_id,
+                        CASE
+    WHEN LEFT(c.national_id, 2) = '99'
+        THEN 'COW-' || RIGHT(c.national_id, 3)
+    ELSE 'COW-' || LPAD(
+        c.id::text,
+        3,
+        '0'
+    )
+END AS display_id,
                         ae.anomaly_type,
                         ae.severity,
                         ae.score,
