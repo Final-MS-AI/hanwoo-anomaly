@@ -237,7 +237,7 @@
 
 .environment-system-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
   margin: 16px 0;
   padding: 5px;
@@ -329,6 +329,15 @@
 .live-cctv-frame {
   display: block;
   object-fit: contain;
+}
+
+.identity-analysis-frame {
+  display: block;
+  width: 100%;
+  min-height: 720px;
+  border: 0;
+  border-radius: 13px;
+  background: #0d120f;
 }
 
 .live-cctv-placeholder > span {
@@ -1816,6 +1825,15 @@
   }
 
   .remote-connection-meta > button { width: 100%; }
+
+  .environment-system-tabs button {
+    padding: 7px 5px;
+    font-size: 10px;
+  }
+
+  .identity-analysis-frame {
+    min-height: 930px;
+  }
 
   .device-setup-page {
     width: calc(100% - 24px);
