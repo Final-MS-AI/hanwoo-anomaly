@@ -49,6 +49,9 @@ hanwoo.koreacentral.cloudapp.azure.com {
 	handle /rag/* {
 		reverse_proxy 127.0.0.1:8000
 	}
+	handle /api/dashboard {
+	reverse_proxy 127.0.0.1:8000
+}
 	handle /muzzle/* {
 		reverse_proxy 127.0.0.1:8001
 	}

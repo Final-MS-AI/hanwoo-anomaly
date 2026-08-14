@@ -59,7 +59,7 @@ function AbnormalCattleDashboard() {
       setLoadError("");
 
       try {
-        const response = await fetch(`${API_BASE_URL}/dashboard`, {
+        const response = await fetch(`${API_BASE_URL}/api/dashboard`, {
           credentials: "include",
         });
         const result = await response.json().catch(() => null);
