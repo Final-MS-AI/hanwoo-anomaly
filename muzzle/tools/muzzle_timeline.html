@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>개체 식별 이력 · CoWow</title>
+<style>
+:root{--bg:#faf6ec;--card:#fff;--line:#ebe3d3;--tx:#3a352f;--dim:#8b8378;--acc:#2f6b45;--btn:#4a3b2c;--soft:#f4efe2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:-apple-system,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;line-height:1.6}
+.top{background:var(--card);border-bottom:1px solid var(--line);padding:14px 20px}
+.top .in{max-width:1080px;margin:0 auto;display:flex;align-items:center;gap:16px}
+.logo{font-weight:800;font-size:19px;color:#22c3d6;letter-spacing:-.02em}
+.back{margin-left:auto;font-size:13px;color:var(--dim);text-decoration:none;border:1px solid var(--line);padding:7px 14px;border-radius:8px}
+.back:hover{background:var(--soft)}
+.wrap{max-width:1080px;margin:0 auto;padding:26px 20px 80px}
+.eyebrow{font-size:12px;color:var(--dim);letter-spacing:.06em}
+h1{font-size:24px;margin:2px 0 4px;letter-spacing:-.02em}
+.sub{color:var(--dim);font-size:14px;margin-bottom:22px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;margin-bottom:16px}
+.card h2{font-size:14px;margin:0 0 14px;color:var(--acc);font-weight:700}
+label{font-size:13px;color:var(--dim);margin-right:6px}
+input[type=text]{background:var(--soft);border:1px solid var(--line);color:var(--tx);padding:9px 12px;border-radius:9px;font-size:14px;width:180px;font-family:ui-monospace,monospace}
+button{background:var(--btn);border:0;color:#fff;font-weight:700;padding:10px 20px;border-radius:9px;font-size:14px;cursor:pointer}
+.row{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kv div{background:var(--soft);border-radius:12px;padding:12px 14px}
+.kv b{display:block;font-size:22px;font-family:ui-monospace,monospace;letter-spacing:-.02em}
+.kv span{font-size:12px;color:var(--dim)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:8px}
+th{color:var(--dim);font-weight:600;font-size:12px;text-align:left}
+td.m{font-family:ui-monospace,monospace}
+tr.first td{background:#eaf5ed;font-weight:600}
+.strip{display:flex;height:26px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.strip i{flex:1 1 auto;min-width:1px}
+.striplabel{font-size:12px;color:var(--dim);margin:14px 0 6px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim);margin-top:10px}
+.legend s{width:11px;height:11px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px}
+.note{font-size:13px;color:#5c5449;background:var(--soft);border-left:3px solid var(--acc);padding:11px 14px;border-radius:0 9px 9px 0;margin-top:14px}
+.err{color:#c0392b}
+.ok{color:var(--acc)}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<div class="top"><div class="in">
+  <span class="logo">COWOW</span>
+  <a class="back" href="/dashboard">&larr; 대시보드</a>
+</div></div>
+<div class="wrap">
+<div class="eyebrow">개체 식별 · 비문 기반</div>
+<h1>개체 식별 이력</h1>
+<div class="sub">확정된 개체번호가 그 트랙의 <b>과거 관측 전체</b>에 소급 적용된 결과입니다. 원본 관측 행은 수정되지 않습니다.</div>
+
+<div class="card"><div class="row">
+  <label>개체번호</label>
+  <input type="text" id="nid" value="000000000010">
+  <label><input type="checkbox" id="test"> 검증 세션 포함</label>
+  <button id="go">조회</button>
+  <span id="msg" class="sub" style="margin:0"></span>
+</div></div>
+
+<div id="out"></div>
+</div>
+
+<script>
+var COLORS={feeding:"#3b82c4",standing:"#d9a520",walking:"#3f9e5a",lying:"#8b5cf6",ruminating:"#d9548a"};
+var GRAY="#cfc7b6";
+function col(b){ return COLORS[b] || (b ? "#a49a8a" : GRAY); }
+function esc(s){ var d=document.createElement("span"); d.textContent=(s==null?"":String(s)); return d.innerHTML; }
+function hhmmss(t){ return String(t).slice(11,23); }
+
+document.getElementById("go").onclick=load;
+document.getElementById("nid").addEventListener("keydown",function(e){ if(e.key==="Enter"){ load(); } });
+
+function load(){
+  var nid=document.getElementById("nid").value.trim();
+  var inc=document.getElementById("test").checked;
+  var msg=document.getElementById("msg");
+  var out=document.getElementById("out");
+  if(!nid){ msg.className="sub err"; msg.textContent="개체번호를 입력하세요"; return; }
+  msg.className="sub"; msg.textContent="조회 중...";
+  out.innerHTML="";
+  var url="/muzzle/cattle/"+encodeURIComponent(nid)+"/timeline?limit=5000&include_test="+(inc?"true":"false");
+  fetch(url).then(function(r){
+    if(!r.ok){ throw new Error("HTTP "+r.status); }
+    return r.json();
+  }).then(function(d){
+    msg.className="sub ok";
+    msg.textContent="관측 "+d.observation_count+"건 / 트랙 "+d.segment_count+"건"+(d.truncated?" (일부 잘림)":"");
+    render(d);
+  }).catch(function(e){
+    msg.className="sub err"; msg.textContent="실패: "+e.message;
+  });
+}
+
+function render(d){
+  var obs=d.observations||[];
+  var segs=d.segments||[];
+  var out=document.getElementById("out");
+  if(!obs.length){
+    out.innerHTML='<div class="card"><h2>결과 없음</h2><div class="sub">이 개체에 활성 바인딩이 없거나, 해당 세션이 검증용(test_)이라 기본 조회에서 제외됐습니다. "검증 세션 포함"을 켜고 다시 조회하세요.</div></div>';
+    return;
+  }
+  var h="", i;
+  var topSim=(segs[0]&&segs[0].similarity!=null)?Number(segs[0].similarity).toFixed(4):"-";
+
+  h+='<div class="card"><h2>요약</h2><div class="kv">'
+   +'<div><span>개체번호</span><b>'+esc(d.national_id)+'</b></div>'
+   +'<div><span>트랙 수</span><b>'+esc(d.segment_count)+'</b></div>'
+   +'<div><span>개체번호가 붙은 관측</span><b>'+esc(d.observation_count)+'</b></div>'
+   +'<div><span>확정 유사도</span><b>'+topSim+'</b></div>'
+   +'</div></div>';
+
+  h+='<div class="card"><h2>소급 적용 결과</h2><div class="scroll"><table>'
+   +'<tr><th>조회 대상</th><th>개체번호 있는 행</th><th>없는 행</th><th>비고</th></tr>'
+   +'<tr><td class="m">track_observation</td><td class="m">0</td><td class="m">'+esc(d.observation_count)+'</td><td>원본 관측 테이블. 개체번호 컬럼이 없습니다</td></tr>'
+   +'<tr><td class="m">v_identified_track_observation</td><td class="m">'+esc(d.observation_count)+'</td><td class="m">0</td><td>조회 시 바인딩 테이블을 결합</td></tr>'
+   +'</table></div><div class="note">과거 행을 수정한 것이 아닙니다. 바인딩 테이블에 <b>1행</b>을 추가했고, 조회 시점에 결합이 소급 적용합니다. 판정을 되돌릴 때도 그 1행만 비활성화하면 됩니다.</div></div>';
+
+  var seen={}, strip="";
+  for(i=0;i<obs.length;i++){
+    var b=obs[i].behavior, key=b||"(없음)";
+    seen[key]=(seen[key]||0)+1;
+    strip+='<i style="background:'+col(b)+'" title="'+esc(hhmmss(obs[i].ts))+" / "+esc(key)+'"></i>';
+  }
+  var gray="", step=Math.max(1,Math.floor(obs.length/400));
+  for(i=0;i<obs.length;i+=step){ gray+='<i style="background:'+GRAY+'"></i>'; }
+  var leg="";
+  for(var k in seen){ leg+='<span><s style="background:'+col(k==="(없음)"?null:k)+'"></s>'+esc(k)+' '+seen[k]+'</span>'; }
+
+  h+='<div class="card"><h2>시간축</h2>'
+   +'<div class="striplabel">식별 전 &mdash; 추적 번호만 있고 개체는 미상 (설명용 도식)</div>'
+   +'<div class="strip">'+gray+'</div>'
+   +'<div class="striplabel">식별 후 &mdash; 전 구간이 개체번호와 행동을 가집니다 (실제 데이터)</div>'
+   +'<div class="strip">'+strip+'</div>'
+   +'<div class="legend">'+leg+'</div></div>';
+
+  h+='<div class="card"><h2>트랙</h2><div class="scroll"><table>'
+   +'<tr><th>ID</th><th>카메라</th><th>track</th><th>세션</th><th>시작</th><th>종료</th><th>관측</th><th>유사도</th><th>출처</th></tr>';
+  for(i=0;i<segs.length;i++){
+    var g=segs[i];
+    h+='<tr><td class="m">'+esc(g.segment_id)+'</td><td class="m">'+esc(g.camera_id)+'</td><td class="m">'+esc(g.track_id)+'</td>'
+     +'<td class="m">'+esc(g.session_id)+'</td><td class="m">'+esc(hhmmss(g.started_at))+'</td><td class="m">'+esc(hhmmss(g.ended_at))+'</td>'
+     +'<td class="m">'+esc(g.observations)+'</td><td class="m">'+(g.similarity!=null?Number(g.similarity).toFixed(4):"-")+'</td><td>'+esc(g.source)+'</td></tr>';
+  }
+  h+='</table></div></div>';
+
+  h+='<div class="card"><h2>관측 (앞 30건)</h2><div class="scroll"><table>'
+   +'<tr><th>시각</th><th>frame</th><th>트랙</th><th>bbox</th><th>검출</th><th>행동</th><th>유사도</th></tr>';
+  var lim=Math.min(30,obs.length);
+  for(i=0;i<lim;i++){
+    var o=obs[i];
+    var bb=(o.bbox||[]).map(function(v){ return Number(v).toFixed(0); }).join(", ");
+    h+='<tr'+(i===0?' class="first"':'')+'><td class="m">'+esc(hhmmss(o.ts))+'</td><td class="m">'+esc(o.frame_idx)+'</td>'
+     +'<td class="m">'+esc(o.segment_id)+'</td><td class="m">'+esc(bb)+'</td>'
+     +'<td class="m">'+(o.conf!=null?Number(o.conf).toFixed(3):"-")+'</td><td>'+esc(o.behavior||"-")+'</td>'
+     +'<td class="m">'+(o.similarity!=null?Number(o.similarity).toFixed(4):"-")+'</td></tr>';
+  }
+  var fs=(obs[0].similarity!=null)?Number(obs[0].similarity).toFixed(4):"-";
+  h+='</table></div><div class="note">첫 행이 핵심입니다. <b>frame '+esc(obs[0].frame_idx)+'</b> 은 코가 카메라에 보이기 한참 전인데도 개체번호와 유사도 '+fs+' 를 가집니다. 식별 시점 이전 관측까지 소급 적용됐다는 직접 증거입니다.</div></div>';
+
+  out.innerHTML=h;
+}
+
+load();
+</script>
+</body>
+</html>
