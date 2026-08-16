@@ -11,7 +11,10 @@
 
 좌표는 정규화(0~1), bbox 는 픽셀이다. frame 을 함께 저장해 변환한다.
 """
-
+import json
+import os
+import urllib.parse
+import urllib.request
 ZONES = {
     "top": {
         "frame": (1920, 1080),
@@ -23,9 +26,44 @@ ZONES = {
 }
 
 
-def poly_px(name):
-    """정규화 좌표를 픽셀로 변환한 꼭짓점 목록."""
+# --- DB 우선 조회 (2026-08-17) -------------------------------------------
+# 구역은 사용자가 CCTV 화면에서 지정하고 track_zone 에 저장된다.
+# DB 가 없거나 구역이 등록되지 않았으면 위 ZONES 딕셔너리로 폴백한다.
+# 폴백이 있으므로 DB 장애가 시연을 멈추지 않는다.
+ZONE_API = os.getenv("MUZZLE_ZONE_API",
+                     "http://127.0.0.1:8001/muzzle/zones")
+USE_DB_ZONE = os.getenv("MUZZLE_ZONE_SOURCE", "db") != "dict"
+
+
+def zone_spec(name, camera_id="A", device_id=None):
+    """구역 정의를 {"frame": (w,h), "poly": [(x,y),...], "anchor": str} 로 반환.
+
+    DB -> 실패 시 ZONES 딕셔너리. 어느 쪽을 썼는지 source 로 알린다.
+    """
+    if USE_DB_ZONE:
+        try:
+            q = {"camera_id": camera_id}
+            if device_id:
+                q["device_id"] = device_id
+            url = f"{ZONE_API}/{name}?" + urllib.parse.urlencode(q)
+            with urllib.request.urlopen(url, timeout=3) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            return {"frame": (d["frame_w"], d["frame_h"]),
+                    "poly": [(float(x), float(y)) for x, y in d["poly"]],
+                    "anchor": d.get("anchor", "topright"),
+                    "source": f"db(id={d['id']})"}
+        except Exception as e:
+            print(f"[zones] DB 조회 실패 ({e}) -> 내장 정의로 폴백", flush=True)
     z = ZONES[name]
+    return {"frame": z["frame"],
+            "poly": [(float(x), float(y)) for x, y in z["poly"]],
+            "anchor": z.get("anchor", "topright"),
+            "source": "dict"}
+
+
+def poly_px(name, camera_id="A", device_id=None):
+    """정규화 좌표를 픽셀로 변환한 꼭짓점 목록."""
+    z = zone_spec(name, camera_id, device_id)
     w, h = z["frame"]
     return [(x * w, y * h) for x, y in z["poly"]]
 
