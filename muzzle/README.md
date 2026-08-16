@@ -91,3 +91,27 @@ Caddy가 `/muzzle` 접두어를 **제거하지 않는다.** 라우트에 접두�
 | `weights/clip/ViT-B-32.pt` (338MB) | open_clip 공개 가중치. 최초 실행 시 자동 다운로드 |
 | 영상 원본(mp4), 크롭 이미지 | 용량·출처 문제로 제외 |
 | `.env` | `api/.env.example` 참고해 `DATABASE_URL` 작성 |
+
+## 초크포인트 구역 (2026-08-17 추가)
+
+급이대 구역은 코드에 하드코딩하지 않는다. 사용자가 CCTV 화면에서 직접 지정하고
+`public.track_zone` 에 저장한다.
+
+| 경로 | 기능 |
+|---|---|
+| `GET /muzzle/zones` | 구역 목록. 기본 활성만 |
+| `GET /muzzle/zones/{name}` | 이름으로 활성 구역 1건 |
+| `POST /muzzle/zones` | 등록. 같은 키의 활성 구역은 자동 비활성화 후 교체 |
+| `DELETE /muzzle/zones/{id}` | 비활성화. 행은 보존 |
+
+지정 화면은 `muzzle/tools/zone_setup.html`, 조회 화면은
+`muzzle/tools/muzzle_timeline.html` 이다. 두 파일은 React 빌드와 무관한 독립
+정적 페이지이며 `/var/www/hanwoo/` 에 복사만으로 배포된다.
+
+> **주의 — 좌표는 정규화(0~1)다.** 픽셀 좌표를 보내면 422 로 거부된다.
+> 막지 않으면 구역이 화면 좌상단의 점이 되고, 핸드오프가 에러 없이
+> 후보 0건만 낸다.
+
+`zones.py` 의 `poly_px()` 는 DB 를 먼저 조회하고 실패하면 파일 내 `ZONES`
+딕셔너리로 폴백한다. `run_e2e.py` 는 수정하지 않았다. 폴백을 강제하려면
+`MUZZLE_ZONE_SOURCE=dict` 를 지정한다.
