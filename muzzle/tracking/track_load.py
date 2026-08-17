@@ -35,6 +35,7 @@ with pg.connect(os.getenv("DATABASE_URL")) as c:
               (segment_id, ts, frame_idx, bbox_x, bbox_y, bbox_w, bbox_h, conf,
                behavior, behavior_conf)
             VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ON CONFLICT (segment_id, frame_idx) DO NOTHING
         """, [(seg_id, o["ts"], o["frame_idx"], o["bbox_x"], o["bbox_y"],
                o["bbox_w"], o["bbox_h"], o["conf"],
                o.get("behavior"), o.get("behavior_conf")) for o in obs])

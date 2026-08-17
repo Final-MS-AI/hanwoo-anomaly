@@ -58,3 +58,17 @@ SELECT o.id, o.ts, o.frame_idx, o.bbox_x, o.bbox_y, o.bbox_w, o.bbox_h, o.conf,
 FROM       public.track_observation      o
 JOIN       public.track_segment          s ON s.id = o.segment_id
 LEFT JOIN  public.track_identity_binding b ON b.segment_id = s.id AND b.is_active;
+-- ── 2026-08-18 추가 ────────────────────────────────────────────────
+-- 같은 session_id 로 track_load.py 를 두 번 실행하면 관측 행이 조용히
+-- 두 배가 되는 사고가 있었다 (demo_20260814070456-136a18, 2832행 중복).
+-- track_segment 에는 UNIQUE 가 있어 세그먼트는 중복되지 않았고
+-- frame_count 도 정상값을 유지했으므로 눈으로는 탐지되지 않았다.
+--
+-- 유일 인덱스로 DB 가 거부하게 하고, track_load.py 는 ON CONFLICT
+-- DO NOTHING 으로 예외 없이 넘긴다. 재적재가 멱등이 된다.
+--
+-- 주의: Postgres 는 NULL 을 서로 다른 값으로 취급하므로 frame_idx 가
+-- NULL 인 행은 이 인덱스로 막히지 않는다. track_load.py 는 항상 값을
+-- 채우므로 현재 문제되지 않으나 알려진 범위로 기록한다.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_track_obs_segment_frame
+  ON public.track_observation (segment_id, frame_idx);
