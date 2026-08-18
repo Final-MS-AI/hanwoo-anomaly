@@ -1,0 +1,23 @@
+[Unit]
+Description=COWOW realtime anomaly event forwarder
+After=network-online.target realtime-inference.service
+Wants=network-online.target realtime-inference.service
+
+[Service]
+Type=simple
+User=azureuser
+WorkingDirectory=/home/azureuser/realtime-inference
+EnvironmentFile=/home/azureuser/cowow-edge-credentials.env
+Environment=COWOW_INFERENCE_WS_URL=ws://127.0.0.1:8100/ws/top
+Environment=COWOW_CAMERA_ID=CAMERA-01
+Environment=COWOW_LYING_WARNING_SECONDS=300
+Environment=COWOW_EVENT_COOLDOWN_SECONDS=1800
+Environment=COWOW_EVENT_CLIP_SECONDS=10
+ExecStart=/home/azureuser/realtime-inference/.venv/bin/python /home/azureuser/realtime-inference/anomaly_forwarder.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
+

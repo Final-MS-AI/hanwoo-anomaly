@@ -2,8 +2,11 @@ import html
 import os
 import smtplib
 from email.message import EmailMessage
+from urllib.parse import quote
 
+import httpx
 import psycopg
+from azure.identity import DefaultAzureCredential
 from psycopg.types.json import Jsonb
 from fastapi import APIRouter, Cookie, HTTPException, Response
 from pydantic import BaseModel, Field
@@ -23,6 +26,18 @@ router = APIRouter(tags=["Family device sharing"])
 
 PHYSICAL_DEVICE_ID = os.getenv("ESP32_PHYSICAL_DEVICE_ID", "ESP32-01")
 PUBLIC_DEVICE_NUMBER = os.getenv("ESP32_PUBLIC_DEVICE_NUMBER", "COWOW-0001")
+IOT_HUB_HOSTNAME = os.getenv(
+    "AZURE_IOT_HUB_HOSTNAME",
+    "cow-hub.azure-devices.net",
+)
+_iot_credential = None
+
+
+def iot_credential():
+    global _iot_credential
+    if _iot_credential is None:
+        _iot_credential = DefaultAzureCredential()
+    return _iot_credential
 
 
 class ShareInviteRequest(BaseModel):
@@ -359,7 +374,72 @@ def actuator(body: ActuatorRequest, cowow_session: str | None = Cookie(default=N
             )
             command_id = cursor.fetchone()[0]
         connection.commit()
-    return {"commandId": command_id, "status": "pending"}
+    request = {
+        "methodName": "setActuator",
+        "connectTimeoutInSeconds": 5,
+        "responseTimeoutInSeconds": 15,
+        "payload": {
+            "actuator": body.actuator,
+            "value": int(body.value),
+        },
+    }
+
+    try:
+        access_token = iot_credential().get_token(
+            "https://iothubs.azure.net/.default"
+        )
+        response = httpx.post(
+            "https://"
+            + IOT_HUB_HOSTNAME
+            + "/twins/"
+            + quote(body.deviceId, safe="")
+            + "/methods?api-version=2021-04-12",
+            headers={
+                "Authorization": "Bearer " + access_token.token,
+                "Content-Type": "application/json",
+            },
+            json=request,
+            timeout=25,
+        )
+        response.raise_for_status()
+        method_result = response.json()
+        result_status = int(method_result.get("status", 500))
+        result_payload = method_result.get("payload") or {}
+    except Exception as exc:
+        with get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE device_commands SET status='failed' WHERE id=%s",
+                    (command_id,),
+                )
+            connection.commit()
+        print("IoT Hub direct method error:", repr(exc))
+        raise HTTPException(
+            status_code=502,
+            detail="장비가 오프라인이거나 제어 명령에 응답하지 않았습니다.",
+        ) from exc
+
+    command_status = "completed" if result_status == 200 else "failed"
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE device_commands SET status=%s WHERE id=%s",
+                (command_status, command_id),
+            )
+        connection.commit()
+
+    if result_status != 200:
+        raise HTTPException(
+            status_code=502,
+            detail="장비가 제어 명령을 처리하지 못했습니다.",
+        )
+
+    return {
+        "commandId": command_id,
+        "status": command_status,
+        "deviceStatus": result_status,
+        "deviceResponse": result_payload,
+    }
 
 
 @router.get("/devices/{device_id}/state")
@@ -372,4 +452,4 @@ def device_state(device_id: str, cowow_session: str | None = Cookie(default=None
             row = cursor.fetchone()
     if not row:
         return {"deviceId": device_id, "online": False, "lastSeenAt": None, "sensors": {}}
-    return {"deviceId": device_id, "firmwareVersion": row[0], "wifiRssi": row[1], "lastSeenAt": row[2].isoformat() if row[2] else None, "telemetryAt": row[7].isoformat() if row[7] else None, "online": bool(row[8]), "sensors": {"temperature": row[3], "humidity": row[4], "ammonia": row[5], "carbonDioxide": row[6]}}
+    return {"deviceId": device_id, "firmwareVersion": row[0], "wifiRssi": row[1], "lastSeenAt": row[2].isoformat() if row[2] else None, "telemetryAt": row[7].isoformat() if row[7] else None, "online": bool(row[8]), "sensors": {"temperature": row[3], "humidity": row[4], "airQuality": row[5]}}

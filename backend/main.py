@@ -672,12 +672,9 @@ async def kakao_callback(
     return response
 
 
-@app.get("/anomalies/active")
-def get_active_anomalies():
-    return {
-        "data": [],
-        "count": 0
-    }
+from anomaly_event_api import router as anomaly_event_router
+
+app.include_router(anomaly_event_router)
 
 from google_auth import router as google_auth_router
 from guest_auth import router as guest_auth_router
