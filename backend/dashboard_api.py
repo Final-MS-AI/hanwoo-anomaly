@@ -5,6 +5,7 @@ import psycopg
 from fastapi import APIRouter, Cookie, HTTPException
 
 from auth_session import read_user_id
+from anomaly_event_api import read_url
 
 
 router = APIRouter(
@@ -37,7 +38,7 @@ def get_dashboard(
                 # -------------------------------------------------
                 cursor.execute(
                     """
-                    SELECT id
+                    SELECT id, provider
                     FROM public.users
                     WHERE id = %s
                     LIMIT 1
@@ -45,11 +46,13 @@ def get_dashboard(
                     (user_id,),
                 )
 
-                if cursor.fetchone() is None:
+                user_row = cursor.fetchone()
+                if user_row is None:
                     raise HTTPException(
                         status_code=401,
                         detail="사용자를 찾을 수 없습니다.",
                     )
+                user_provider = user_row[1]
 
                 # -------------------------------------------------
                 # 2. 대시보드 요약
@@ -197,6 +200,49 @@ def get_dashboard(
 
                 recent_rows = cursor.fetchall()
 
+                # -------------------------------------------------
+                # 5. RTSP 실시간 분석 이벤트
+                # 장비 관리자와 공유 구성원에게만 노출
+                # -------------------------------------------------
+                cursor.execute(
+                    """
+                    SELECT e.id, e.device_id, e.camera_id, e.cattle_id,
+                           e.status, e.behavior, e.confidence, e.detected_at,
+                           e.image_blob_name, e.video_blob_name
+                    FROM public.device_anomaly_events e
+                    WHERE e.resolved_at IS NULL
+                      AND (
+                        EXISTS (
+                            SELECT 1 FROM public.device_owners o
+                            WHERE o.device_id = e.device_id
+                              AND o.user_id = %s
+                        )
+                        OR EXISTS (
+                            SELECT 1 FROM public.device_members m
+                            WHERE m.device_id = e.device_id
+                              AND m.user_id = %s
+                        )
+                        OR (
+                            %s = 'guest'
+                            AND e.device_id = %s
+                            AND NOT EXISTS (
+                                SELECT 1 FROM public.device_owners o2
+                                WHERE o2.device_id = e.device_id
+                            )
+                        )
+                      )
+                    ORDER BY e.detected_at DESC
+                    LIMIT 100
+                    """,
+                    (
+                        user_id,
+                        user_id,
+                        user_provider,
+                        os.getenv("ESP32_PHYSICAL_DEVICE_ID", "ESP32-01"),
+                    ),
+                )
+                realtime_rows = cursor.fetchall()
+
     except HTTPException:
         raise
 
@@ -237,6 +283,62 @@ def get_dashboard(
         for row in abnormal_rows
     ]
 
+    behavior_labels = {
+        "prolonged_standing": "장시간 서 있음",
+        "prolonged_lying": "장시간 누움",
+        "standing": "서 있음",
+        "lying": "누워 있음",
+        "walking": "걷는 중",
+        "feeding": "섭식 중",
+    }
+    realtime_cattle = []
+    for row in realtime_rows:
+        display_id = row[3] or f"{row[2] or row[1]} 미확인 개체"
+        realtime_cattle.append(
+            {
+                "cattle_id": str(row[0]),
+                "display_id": display_id,
+                "national_id": None,
+                "ear_tag_number": None,
+                "anomaly_type": row[5],
+                "severity": row[4],
+                "score": row[6],
+                "message": behavior_labels.get(row[5], row[5] or "이상 행동"),
+                "anomaly_event_id": str(row[0]),
+                "detected_at": row[7].isoformat() if row[7] is not None else None,
+                "image_url": read_url(row[8]),
+                "video_url": read_url(row[9]),
+                "device_id": row[1],
+                "camera_id": row[2],
+            }
+        )
+
+    abnormal_cattle.extend(realtime_cattle)
+    abnormal_cattle.sort(
+        key=lambda item: (
+            2 if item["severity"] == "danger" else 1,
+            item["detected_at"] or "",
+        ),
+        reverse=True,
+    )
+
+    # 같은 개체의 여러 이벤트는 가장 높은 현재 상태 한 건으로 계산한다.
+    severity_by_cattle = {}
+    for item in abnormal_cattle:
+        cattle_key = item["display_id"]
+        severity_level = 2 if item["severity"] == "danger" else 1
+        severity_by_cattle[cattle_key] = max(
+            severity_by_cattle.get(cattle_key, 0),
+            severity_level,
+        )
+    summary["danger"] = sum(level == 2 for level in severity_by_cattle.values())
+    summary["warning"] = sum(level == 1 for level in severity_by_cattle.values())
+    summary["total"] = max(summary["total"], len(severity_by_cattle))
+    summary["normal"] = max(
+        summary["total"] - summary["warning"] - summary["danger"],
+        0,
+    )
+
     recent_alerts = [
         {
             "cattle_id": row[0],
@@ -253,6 +355,21 @@ def get_dashboard(
         }
         for row in recent_rows
     ]
+
+    recent_alerts.extend(
+        {
+            "cattle_id": str(row[0]),
+            "display_id": row[3] or f"{row[2] or row[1]} 미확인 개체",
+            "anomaly_type": row[5],
+            "severity": row[4],
+            "score": row[6],
+            "message": behavior_labels.get(row[5], row[5] or "이상 행동"),
+            "detected_at": row[7].isoformat() if row[7] is not None else None,
+        }
+        for row in realtime_rows
+    )
+    recent_alerts.sort(key=lambda item: item["detected_at"] or "", reverse=True)
+    recent_alerts = recent_alerts[:5]
 
     return {
         "summary": summary,
