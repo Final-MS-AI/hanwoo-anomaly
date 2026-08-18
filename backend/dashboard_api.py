@@ -206,32 +206,55 @@ def get_dashboard(
                 # -------------------------------------------------
                 cursor.execute(
                     """
-                    SELECT e.id, e.device_id, e.camera_id, e.cattle_id,
-                           e.status, e.behavior, e.confidence, e.detected_at,
-                           e.image_blob_name, e.video_blob_name
-                    FROM public.device_anomaly_events e
-                    WHERE e.resolved_at IS NULL
-                      AND (
-                        EXISTS (
-                            SELECT 1 FROM public.device_owners o
-                            WHERE o.device_id = e.device_id
-                              AND o.user_id = %s
-                        )
-                        OR EXISTS (
-                            SELECT 1 FROM public.device_members m
-                            WHERE m.device_id = e.device_id
-                              AND m.user_id = %s
-                        )
-                        OR (
-                            %s = 'guest'
-                            AND e.device_id = %s
-                            AND NOT EXISTS (
-                                SELECT 1 FROM public.device_owners o2
-                                WHERE o2.device_id = e.device_id
+                    WITH ranked_realtime AS (
+                        SELECT e.id, e.device_id, e.camera_id, e.cattle_id,
+                               e.status, e.behavior, e.confidence, e.detected_at,
+                               e.image_blob_name, e.video_blob_name,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY
+                                       e.device_id,
+                                       COALESCE(
+                                           NULLIF(e.cattle_id, ''),
+                                           NULLIF(e.camera_id, ''),
+                                           e.device_id
+                                       )
+                                   ORDER BY
+                                       CASE
+                                           WHEN e.status = 'danger' THEN 2
+                                           WHEN e.status = 'warning' THEN 1
+                                           ELSE 0
+                                       END DESC,
+                                       e.detected_at DESC
+                               ) AS rn
+                        FROM public.device_anomaly_events e
+                        WHERE e.resolved_at IS NULL
+                          AND (
+                            EXISTS (
+                                SELECT 1 FROM public.device_owners o
+                                WHERE o.device_id = e.device_id
+                                  AND o.user_id = %s
                             )
-                        )
-                      )
-                    ORDER BY e.detected_at DESC
+                            OR EXISTS (
+                                SELECT 1 FROM public.device_members m
+                                WHERE m.device_id = e.device_id
+                                  AND m.user_id = %s
+                            )
+                            OR (
+                                %s = 'guest'
+                                AND e.device_id = %s
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM public.device_owners o2
+                                    WHERE o2.device_id = e.device_id
+                                )
+                            )
+                          )
+                    )
+                    SELECT id, device_id, camera_id, cattle_id,
+                           status, behavior, confidence, detected_at,
+                           image_blob_name, video_blob_name
+                    FROM ranked_realtime
+                    WHERE rn = 1
+                    ORDER BY detected_at DESC
                     LIMIT 100
                     """,
                     (
