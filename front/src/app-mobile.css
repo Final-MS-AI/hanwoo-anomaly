@@ -270,6 +270,13 @@
   background: #fbfaf8;
 }
 
+.live-cctv-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
 .live-cctv-header {
   display: flex;
   align-items: center;
@@ -330,7 +337,6 @@
   display: block;
   object-fit: contain;
 }
-
 
 .live-cctv-placeholder > span {
   display: grid;

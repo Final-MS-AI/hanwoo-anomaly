@@ -10,6 +10,9 @@ const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const COWOW_0001_LIVE_VIEW_URL =
   import.meta.env.VITE_LIVE_VIEW_URL ??
   "https://hanwoo2.koreacentral.cloudapp.azure.com/top/raw";
+const COWOW_0001_IDENTITY_VIEW_URL =
+  import.meta.env.VITE_IDENTITY_LIVE_VIEW_URL ??
+  "https://hanwoo2.koreacentral.cloudapp.azure.com/identity-raw";
 
 function getLiveViewUrl(device) {
   if (!device) return "";
@@ -532,6 +535,7 @@ function BarnEnvironmentControl() {
       </div>
         </>
       ) : (
+        <div className="live-cctv-grid">
         <section className="live-cctv-panel" aria-label="실시간 CCTV 화면">
           <div className="live-cctv-header">
             <div>
@@ -559,6 +563,34 @@ function BarnEnvironmentControl() {
             hanwoo2 서버의 상단 CCTV 원본 실시간 신호를 동일하게 표시합니다.
           </p>
         </section>
+        <section className="live-cctv-panel" aria-label="비문 귀표 분석 CCTV 화면">
+          <div className="live-cctv-header">
+            <div>
+              <span>CAMERA-02</span>
+              <h3>비문·귀표 RTSP 실시간 화면</h3>
+            </div>
+            <strong><i /> {liveViewUrl ? "스트림 연결" : "시스템 미연결"}</strong>
+          </div>
+
+          {liveViewUrl ? (
+            <img
+              className="live-cctv-frame"
+              src={COWOW_0001_IDENTITY_VIEW_URL}
+              alt="비문 귀표 분석용 실시간 RTSP CCTV"
+            />
+          ) : (
+            <div className="live-cctv-placeholder">
+              <span>▶</span>
+              <strong>비문·귀표 분석 스트림을 준비하고 있습니다.</strong>
+              <p>축사 환경 시스템을 연결하면 두 번째 CCTV 화면이 표시됩니다.</p>
+            </div>
+          )}
+
+          <p className="live-cctv-note">
+            hanwoo2 /top 비문·귀표 탭의 RTSP 실시간 신호를 동일하게 표시합니다.
+          </p>
+        </section>
+        </div>
       )}
     </section>
   );
