@@ -54,8 +54,8 @@ function AbnormalCattleDashboard() {
   useEffect(() => {
     let cancelled = false;
 
-    const loadDashboard = async () => {
-      setIsLoading(true);
+    const loadDashboard = async ({ silent = false } = {}) => {
+      if (!silent) setIsLoading(true);
       setLoadError("");
 
       try {
@@ -68,6 +68,9 @@ function AbnormalCattleDashboard() {
           throw new Error(
             result?.detail || "대시보드 데이터를 불러오지 못했습니다.",
           );
+        }
+        if (!result || typeof result !== "object") {
+          throw new Error("대시보드 API 응답 형식이 올바르지 않습니다.");
         }
         if (cancelled) return;
 
@@ -116,13 +119,18 @@ function AbnormalCattleDashboard() {
           );
         }
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled && !silent) setIsLoading(false);
       }
     };
 
     loadDashboard();
+    const refreshTimer = window.setInterval(
+      () => loadDashboard({ silent: true }),
+      10000,
+    );
     return () => {
       cancelled = true;
+      window.clearInterval(refreshTimer);
     };
   }, []);
 
