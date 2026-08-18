@@ -5,18 +5,16 @@ import _thread
 
 import dht
 import network
+import ntptime
 import ujson
 from machine import ADC, Pin
 
-try:
-    import requests
-except ImportError:
-    import urequests as requests
+from azure_iot import AzureIoTHub
 
 from config import (
-    API_BASE_URL,
     DEVICE_ID,
-    DEVICE_SECRET,
+    IOT_HUB_DEVICE_KEY,
+    IOT_HUB_HOSTNAME,
     WIFI_PASSWORD,
     WIFI_SSID,
 )
@@ -31,12 +29,12 @@ except AttributeError:
 DHT_PIN = 32
 GAS_PIN = 35
 MOTOR_PIN_NUMBERS = (33, 25, 26, 27)
-FIRMWARE_VERSION = "cowow-micropython-2.4.0"
+FIRMWARE_VERSION = "cowow-micropython-iothub-3.0.0"
 
-COMMAND_INTERVAL_MS = 200
 HEARTBEAT_INTERVAL_MS = 20000
 SENSOR_INTERVAL_MS = 30000
 WIFI_RETRY_INTERVAL_MS = 10000
+MQTT_RETRY_INTERVAL_MS = 5000
 
 MOTOR_STEP_DELAYS_US = {
     1: 4000,
@@ -61,31 +59,16 @@ wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
 
 fan_level = 0
+water_sprayer_on = False
 motor_step_index = 0
-last_command_at = 0
 last_heartbeat_at = 0
 last_sensor_at = 0
 last_wifi_attempt_at = 0
+last_mqtt_attempt_at = 0
 temperature = None
 humidity = None
 air_quality = None
-
-
-def close_response(response):
-    if response is not None:
-        try:
-            response.close()
-        except Exception:
-            pass
-    gc.collect()
-
-
-def request_headers():
-    return {
-        "X-Device-Secret": DEVICE_SECRET,
-        "Content-Type": "application/json",
-        "Connection": "close",
-    }
+iot = None
 
 
 def get_wifi_rssi():
@@ -130,6 +113,11 @@ def connect_wifi():
     print("Wi-Fi 연결 완료")
     print("네트워크:", wlan.ifconfig())
     print("신호 세기:", get_wifi_rssi())
+    try:
+        ntptime.settime()
+        print("시간 동기화 완료:", time.gmtime())
+    except Exception as error:
+        print("시간 동기화 오류:", repr(error))
     return True
 
 
@@ -220,109 +208,122 @@ def measure_air_quality():
         return False
 
 
-def send_heartbeat():
-    if not wlan.isconnected():
-        return
+def handle_iot_command(method, payload):
+    global water_sprayer_on
+    print("IoT Hub 명령:", method, payload)
 
-    url = API_BASE_URL + "/devices/" + DEVICE_ID + "/heartbeat"
-    body = ujson.dumps(
-        {
-            "firmwareVersion": FIRMWARE_VERSION,
-            "wifiRssi": get_wifi_rssi(),
-        }
-    )
-    response = None
+    if method == "setActuator":
+        actuator = payload.get("actuator")
+        value = payload.get("value")
+    elif method == "setFanLevel":
+        actuator = "ventilation_fan"
+        value = payload.get("value", 0)
+    elif method == "setWaterSprayer":
+        actuator = "water_sprayer"
+        value = payload.get("value", False)
+    else:
+        raise ValueError("unknown method")
+
+    if actuator == "ventilation_fan":
+        set_fan_level(value)
+    elif actuator == "water_sprayer":
+        water_sprayer_on = bool(value)
+        print("물 뿌리기:", "ON" if water_sprayer_on else "OFF")
+    else:
+        raise ValueError("unknown actuator")
+
+    return {
+        "ok": True,
+        "fanLevel": fan_level,
+        "waterSprayer": water_sprayer_on,
+    }
+
+
+def connect_iot_hub():
+    global iot
+    if not wlan.isconnected():
+        return False
 
     try:
-        response = requests.post(
-            url,
-            headers=request_headers(),
-            data=body,
+        candidate = AzureIoTHub(
+            IOT_HUB_HOSTNAME,
+            DEVICE_ID,
+            IOT_HUB_DEVICE_KEY,
+            handle_iot_command,
         )
-        if response.status_code != 200:
-            print("Heartbeat HTTP:", response.status_code)
-            print(response.text)
+        candidate.connect()
+        iot = candidate
+        print("Azure IoT Hub MQTT 연결 완료")
+        return True
     except Exception as error:
-        print("Heartbeat 오류:", repr(error))
-    finally:
-        close_response(response)
+        iot = None
+        print("Azure IoT Hub MQTT 연결 오류:", repr(error))
+        gc.collect()
+        return False
+
+
+def disconnect_iot_hub():
+    global iot
+    if iot is not None:
+        iot.disconnect()
+    iot = None
+    gc.collect()
+
+
+def publish_iot(payload):
+    if iot is None:
+        return False
+    try:
+        return iot.publish(payload)
+    except Exception as error:
+        print("IoT Hub 전송 오류:", repr(error))
+        disconnect_iot_hub()
+        return False
+
+
+def send_heartbeat():
+    if publish_iot(
+        {
+            "messageType": "heartbeat",
+            "deviceId": DEVICE_ID,
+            "firmwareVersion": FIRMWARE_VERSION,
+            "wifiRssi": get_wifi_rssi(),
+            "fanLevel": fan_level,
+            "waterSprayer": water_sprayer_on,
+        }
+    ):
+        print("IoT Hub Heartbeat 전송 완료")
 
 
 def send_telemetry():
-    if not wlan.isconnected() or temperature is None or humidity is None:
+    if temperature is None or humidity is None:
         return
-
-    url = API_BASE_URL + "/devices/" + DEVICE_ID + "/telemetry"
-    body = ujson.dumps(
+    if publish_iot(
         {
+            "messageType": "telemetry",
+            "deviceId": DEVICE_ID,
             "temperature": temperature,
             "humidity": humidity,
             "airQuality": air_quality,
+            "firmwareVersion": FIRMWARE_VERSION,
+            "wifiRssi": get_wifi_rssi(),
+            "fanLevel": fan_level,
+            "waterSprayer": water_sprayer_on,
         }
-    )
-    response = None
-
-    try:
-        response = requests.post(
-            url,
-            headers=request_headers(),
-            data=body,
-        )
-        if response.status_code != 200:
-            print("Telemetry HTTP:", response.status_code)
-            print(response.text)
-    except Exception as error:
-        print("Telemetry 오류:", repr(error))
-    finally:
-        close_response(response)
+    ):
+        print("IoT Hub Telemetry 전송 완료")
 
 
-def poll_command():
-    if not wlan.isconnected():
-        return
-
-    url = (
-        API_BASE_URL
-        + "/devices/"
-        + DEVICE_ID
-        + "/commands/pending"
-    )
-    response = None
-
-    try:
-        response = requests.get(url, headers=request_headers())
-        if response.status_code != 200:
-            print("명령 조회 HTTP:", response.status_code)
-            print(response.text)
-            return
-
-        command = response.json().get("command")
-        if not command:
-            return
-
-        print("명령 수신:", time.ticks_ms(), command)
-        actuator = command.get("actuator")
-        value = command.get("value")
-
-        if actuator == "ventilation_fan":
-            set_fan_level(value)
-        elif actuator == "water_sprayer":
-            print("물 뿌리기:", "ON" if value else "OFF")
-    except Exception as error:
-        print("명령 조회 오류:", repr(error))
-    finally:
-        close_response(response)
-
-
-print("COWOW ESP32 시작")
+print("COWOW ESP32 Azure IoT Hub 시작")
 print("장치 ID:", DEVICE_ID)
+print("IoT Hub:", IOT_HUB_HOSTNAME)
 print("펌웨어:", FIRMWARE_VERSION)
-print("명령 조회 주기:", COMMAND_INTERVAL_MS, "ms")
 
 release_motor()
 _thread.start_new_thread(motor_worker, ())
 connect_wifi()
 time.sleep(2)
+connect_iot_hub()
 
 measure_air_quality()
 if measure_dht11():
@@ -332,19 +333,29 @@ if wlan.isconnected():
 
 try:
     while True:
-        connect_wifi()
         now = time.ticks_ms()
 
-        if (
-            wlan.isconnected()
-            and time.ticks_diff(now, last_command_at)
-            >= COMMAND_INTERVAL_MS
-        ):
-            last_command_at = now
-            poll_command()
+        if not wlan.isconnected():
+            disconnect_iot_hub()
+            connect_wifi()
+
+        if iot is None:
+            if (
+                not last_mqtt_attempt_at
+                or time.ticks_diff(now, last_mqtt_attempt_at)
+                >= MQTT_RETRY_INTERVAL_MS
+            ):
+                last_mqtt_attempt_at = now
+                connect_iot_hub()
+        else:
+            try:
+                iot.check()
+            except Exception as error:
+                print("IoT Hub 수신 오류:", repr(error))
+                disconnect_iot_hub()
 
         if (
-            wlan.isconnected()
+            iot is not None
             and time.ticks_diff(now, last_heartbeat_at)
             >= HEARTBEAT_INTERVAL_MS
         ):
@@ -364,6 +375,7 @@ try:
 except KeyboardInterrupt:
     print("프로그램 중지")
 finally:
+    disconnect_iot_hub()
     fan_level = 0
     time.sleep_ms(50)
     release_motor()
