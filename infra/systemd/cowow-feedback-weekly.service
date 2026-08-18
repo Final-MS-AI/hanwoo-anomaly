@@ -1,0 +1,11 @@
+[Unit]
+Description=COWOW weekly model feedback learning batch
+After=network-online.target hanwoo-fastapi.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=azureuser
+WorkingDirectory=/home/azureuser/hanwoo-anomaly/backend
+EnvironmentFile=/home/azureuser/3rd_fastapi/.env
+ExecStart=/home/azureuser/3rd_fastapi/venv/bin/python /home/azureuser/hanwoo-anomaly/backend/feedback_weekly_pipeline.py

@@ -91,6 +91,7 @@ function AbnormalCattleDashboard() {
             nationalId: item.national_id,
             earTagNumber: item.ear_tag_number,
             detectedAt: item.detected_at,
+            anomalyEventId: item.anomaly_event_id,
             imageUrl: item.image_url ?? item.imageUrl,
             videoUrl: item.video_url ?? item.videoUrl,
           })),

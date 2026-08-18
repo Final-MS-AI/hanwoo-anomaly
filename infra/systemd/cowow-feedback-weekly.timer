@@ -1,0 +1,11 @@
+[Unit]
+Description=Run COWOW feedback learning every Tuesday
+
+[Timer]
+OnCalendar=Tue *-*-* 02:00:00 Asia/Seoul
+Persistent=true
+RandomizedDelaySec=10m
+Unit=cowow-feedback-weekly.service
+
+[Install]
+WantedBy=timers.target

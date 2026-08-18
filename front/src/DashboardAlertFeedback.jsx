@@ -50,6 +50,7 @@ function DashboardAlertFeedback({ cattle }) {
             status: cattle.status,
             detected_at: cattle.lastDetectedAt,
           },
+          anomaly_event_id: cattle.anomalyEventId || null,
         }),
       });
 
@@ -59,7 +60,7 @@ function DashboardAlertFeedback({ cattle }) {
       }
 
       setSubmitState("success");
-      setMessage("검토 요청을 보냈습니다.");
+      setMessage("피드백이 저장됐습니다. 검토 후 다음 화요일 업데이트에 반영됩니다.");
       setComment("");
     } catch (error) {
       setSubmitState("error");

@@ -117,6 +117,7 @@ def get_dashboard(
                             ae.score,
                             ae.message,
                             ae.detected_at,
+                            ae.id AS anomaly_event_id,
                             ROW_NUMBER() OVER (
                                 PARTITION BY c.id
                                 ORDER BY
@@ -137,21 +138,18 @@ def get_dashboard(
                     SELECT
                         cattle_id,
                         CASE
-    WHEN LEFT(national_id, 2) = '99'
-        THEN 'COW-' || RIGHT(national_id, 3)
-    ELSE 'COW-' || LPAD(
-        cattle_id::text,
-        3,
-        '0'
-    )
-END AS display_id,
+                            WHEN LEFT(national_id, 2) = '99'
+                                THEN 'COW-' || RIGHT(national_id, 3)
+                            ELSE 'COW-' || LPAD(cattle_id::text, 3, '0')
+                        END AS display_id,
                         national_id,
                         ear_tag_number,
                         anomaly_type,
                         severity,
                         score,
                         message,
-                        detected_at
+                        detected_at,
+                        anomaly_event_id
                     FROM ranked_anomalies
                     WHERE rn = 1
                     ORDER BY
@@ -176,14 +174,10 @@ END AS display_id,
                     SELECT
                         c.id AS cattle_id,
                         CASE
-    WHEN LEFT(c.national_id, 2) = '99'
-        THEN 'COW-' || RIGHT(c.national_id, 3)
-    ELSE 'COW-' || LPAD(
-        c.id::text,
-        3,
-        '0'
-    )
-END AS display_id,
+                            WHEN LEFT(c.national_id, 2) = '99'
+                                THEN 'COW-' || RIGHT(c.national_id, 3)
+                            ELSE 'COW-' || LPAD(c.id::text, 3, '0')
+                        END AS display_id,
                         ae.anomaly_type,
                         ae.severity,
                         ae.score,
@@ -233,6 +227,7 @@ END AS display_id,
             "severity": row[5],
             "score": row[6],
             "message": row[7],
+            "anomaly_event_id": str(row[9]),
             "detected_at": (
                 row[8].isoformat()
                 if row[8] is not None
