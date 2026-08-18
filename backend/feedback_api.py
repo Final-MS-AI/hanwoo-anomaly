@@ -5,17 +5,19 @@ import uuid
 from typing import Any, Literal
 
 import psycopg
-from fastapi import APIRouter, Cookie, HTTPException, Query
+from fastapi import APIRouter, Cookie, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field, field_validator
 
 from auth_session import COOKIE_NAME, read_user_id
 from feedback_evidence import capture_feedback_frame
 from feedback_repository import (
+    attach_feedback_media,
     create_feedback,
     list_user_feedback,
     resolve_feedback_context,
 )
 from inference_jobs import get_job
+from anomaly_event_api import upload_media, validate_upload
 
 
 FeedbackType = Literal[
@@ -135,6 +137,9 @@ def submit_feedback(
                 "evidence_blob_name": (
                     context.get("evidence_blob_name") if context else None
                 ),
+                "video_blob_name": (
+                    context.get("video_blob_name") if context else None
+                ),
                 "feedback_fingerprint": feedback_fingerprint,
             }
         )
@@ -166,4 +171,36 @@ def read_my_feedback(
             status_code=500,
             detail="피드백 목록을 불러오지 못했습니다.",
         ) from exc
+
+
+@router.post("/{feedback_id}/evidence")
+def upload_feedback_evidence(
+    feedback_id: uuid.UUID,
+    image: UploadFile | None = File(default=None),
+    video: UploadFile | None = File(default=None),
+    cowow_session: str | None = Cookie(default=None, alias=COOKIE_NAME),
+):
+    user_id = read_user_id(cowow_session)
+    if image is None and video is None:
+        raise HTTPException(status_code=422, detail="이미지 또는 영상을 첨부해 주세요.")
+    validate_upload(image, "image")
+    validate_upload(video, "video")
+    image_blob_name = upload_media(
+        image,
+        event_id=feedback_id,
+        device_id=f"feedback-user-{user_id}",
+        kind="feedback-image",
+    )
+    video_blob_name = upload_media(
+        video,
+        event_id=feedback_id,
+        device_id=f"feedback-user-{user_id}",
+        kind="feedback-video",
+    )
+    updated = attach_feedback_media(
+        str(feedback_id), user_id, image_blob_name, video_blob_name
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="피드백을 찾지 못했습니다.")
+    return updated
 

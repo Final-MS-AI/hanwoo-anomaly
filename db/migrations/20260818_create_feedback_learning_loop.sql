@@ -6,6 +6,7 @@ ALTER TABLE public.model_feedback
     ADD COLUMN IF NOT EXISTS device_id varchar(100),
     ADD COLUMN IF NOT EXISTS triage_stage varchar(32),
     ADD COLUMN IF NOT EXISTS evidence_blob_name text,
+    ADD COLUMN IF NOT EXISTS video_blob_name text,
     ADD COLUMN IF NOT EXISTS feedback_fingerprint varchar(128),
     ADD COLUMN IF NOT EXISTS weekly_batch_id uuid;
 

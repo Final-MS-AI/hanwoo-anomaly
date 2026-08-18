@@ -285,6 +285,24 @@
   resize: vertical;
 }
 
+.dashboard-feedback-files {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dashboard-feedback-files input[type="file"] {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 10px;
+  border: 1px solid #d9cbbc;
+  border-radius: 8px;
+  background: #fff;
+  color: #34271d;
+  font: inherit;
+}
+
 .dashboard-feedback-context,
 .dashboard-feedback-comment,
 .dashboard-feedback-message,
@@ -462,6 +480,10 @@
   }
 
   .dashboard-feedback-form {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-feedback-files {
     grid-template-columns: 1fr;
   }
 }

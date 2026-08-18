@@ -13,7 +13,9 @@ import psycopg
 from azure.core.exceptions import ResourceExistsError
 from azure.identity import DefaultAzureCredential
 from azure.storage.blob import BlobServiceClient, ContentSettings
+from azure.storage.blob import BlobSasPermissions, generate_blob_sas
 from dotenv import load_dotenv
+import httpx
 from psycopg.rows import dict_row
 
 
@@ -34,6 +36,7 @@ POLICY_TYPES = {"false_anomaly", "missed_anomaly"}
 BEHAVIOR_TYPES = {"wrong_behavior"}
 DETECTION_TYPES = {"false_detection", "missed_cow"}
 TRACKING_TYPES = {"wrong_tracking"}
+BEHAVIOR_LABELS = {"feeding", "lying", "standing", "walking"}
 
 
 def database_url() -> str:
@@ -112,6 +115,66 @@ def upload_manifest(batch_id: str, manifest: dict) -> str:
     return blob_name
 
 
+def signed_media_urls(rows: list[dict]) -> list[dict]:
+    account_url = os.getenv(
+        "AZURE_STORAGE_ACCOUNT_URL",
+        "https://cowimage.blob.core.windows.net",
+    )
+    container_name = os.getenv("AZURE_ANOMALY_BLOB_CONTAINER", "anomaly-media")
+    service = BlobServiceClient(
+        account_url=account_url,
+        credential=DefaultAzureCredential(),
+    )
+    now = datetime.now(timezone.utc)
+    delegation_key = service.get_user_delegation_key(
+        key_start_time=now - timedelta(minutes=5),
+        key_expiry_time=now + timedelta(hours=6),
+    )
+    items = []
+    for row in rows:
+        blob_name = row.get("video_blob_name") or row.get("evidence_blob_name")
+        if not blob_name:
+            continue
+        token = generate_blob_sas(
+            account_name=service.account_name,
+            container_name=container_name,
+            blob_name=blob_name,
+            user_delegation_key=delegation_key,
+            permission=BlobSasPermissions(read=True),
+            start=now - timedelta(minutes=5),
+            expiry=now + timedelta(hours=6),
+        )
+        blob = service.get_blob_client(container_name, blob_name)
+        items.append(
+            {
+                "feedback_id": str(row["id"]),
+                "event_id": row["anomaly_event_id"],
+                "corrected_label": row["corrected_label"],
+                "media_url": f"{blob.url}?{token}",
+                "media_kind": "video" if row.get("video_blob_name") else "image",
+            }
+        )
+    return items
+
+
+def request_gpu_training(batch_id: str, rows: list[dict]) -> dict | None:
+    url = os.getenv("FEEDBACK_GPU_TRAIN_URL", "").strip()
+    secret = os.getenv("FEEDBACK_GPU_TRAIN_SECRET", "").strip()
+    if not url or not secret:
+        return None
+    samples = signed_media_urls(rows)
+    if not samples:
+        return {"status": "skipped", "reason": "no_media"}
+    response = httpx.post(
+        url,
+        headers={"X-Feedback-Training-Secret": secret},
+        json={"batch_id": batch_id, "samples": samples},
+        timeout=float(os.getenv("FEEDBACK_GPU_TRAIN_TIMEOUT_SECONDS", "21600")),
+    )
+    response.raise_for_status()
+    return response.json()
+
+
 def run_command(template: str, **values: str) -> subprocess.CompletedProcess | None:
     if not template.strip():
         return None
@@ -153,7 +216,8 @@ def run_weekly() -> dict:
                        device_id, feedback_type, triage_stage, frame_time_seconds,
                        track_id, predicted_label, corrected_label, comment,
                        evidence_path, evidence_blob_name, inference_summary,
-                       feedback_fingerprint, review_status, created_at
+                       video_blob_name, feedback_fingerprint,
+                       review_status, created_at
                 FROM model_feedback
                 WHERE weekly_batch_id IS NULL
                   AND created_at <= %s
@@ -199,6 +263,30 @@ def run_weekly() -> dict:
                     ):
                         row["review_status"] = "approved"
 
+            behavior_candidates = [
+                row for row in rows
+                if row["feedback_type"] in BEHAVIOR_TYPES
+                and row.get("anomaly_event_id")
+                and row.get("corrected_label") in BEHAVIOR_LABELS
+                and row.get("corrected_label") != row.get("predicted_label")
+                and (row.get("evidence_blob_name") or row.get("video_blob_name"))
+            ]
+            behavior_ids = [str(row["id"]) for row in behavior_candidates]
+            if behavior_ids:
+                cursor.execute(
+                    """
+                    UPDATE model_feedback
+                    SET review_status='approved', reviewed_at=NOW(),
+                        reviewer_note='event-linked media correction auto-approved',
+                        updated_at=NOW()
+                    WHERE id=ANY(%s::uuid[]) AND review_status='pending'
+                    """,
+                    (behavior_ids,),
+                )
+                for row in behavior_candidates:
+                    if row["review_status"] == "pending":
+                        row["review_status"] = "approved"
+
             approved = [row for row in rows if row["review_status"] == "approved"]
             policy_rows = [row for row in approved if row["feedback_type"] in POLICY_TYPES]
             after, policy_changed = updated_policy(policy_rows, before)
@@ -231,7 +319,15 @@ def run_weekly() -> dict:
             promoted_at = None
             minimum_samples = int(os.getenv("FEEDBACK_MODEL_MIN_SAMPLES", "20"))
             train_result = None
-            if len(behavior_rows) >= minimum_samples:
+            gpu_result = None
+            if behavior_rows:
+                gpu_result = request_gpu_training(batch_id, behavior_rows)
+                if gpu_result:
+                    candidate_path = gpu_result.get("candidate_model_path")
+                    metrics = gpu_result.get("metrics")
+                    if gpu_result.get("promoted"):
+                        promoted_at = datetime.now(timezone.utc)
+            if len(behavior_rows) >= minimum_samples and gpu_result is None:
                 train_result = run_command(
                     os.getenv("FEEDBACK_TRAIN_COMMAND", ""),
                     manifest=blob_name,

@@ -19,6 +19,8 @@ function DashboardAlertFeedback({ cattle }) {
   const [feedbackType, setFeedbackType] = useState("false_anomaly");
   const [correctedLabel, setCorrectedLabel] = useState("normal");
   const [comment, setComment] = useState("");
+  const [evidenceImage, setEvidenceImage] = useState(null);
+  const [evidenceVideo, setEvidenceVideo] = useState(null);
   const [submitState, setSubmitState] = useState("idle");
   const [message, setMessage] = useState("");
 
@@ -59,9 +61,27 @@ function DashboardAlertFeedback({ cattle }) {
         throw new Error(result?.detail || "피드백 저장에 실패했습니다.");
       }
 
+      if (evidenceImage || evidenceVideo) {
+        const evidence = new FormData();
+        if (evidenceImage) evidence.append("image", evidenceImage);
+        if (evidenceVideo) evidence.append("video", evidenceVideo);
+        const evidenceResponse = await fetch(
+          `${API_BASE_URL}/feedback/${result.id}/evidence`,
+          { method: "POST", credentials: "include", body: evidence },
+        );
+        const evidenceResult = await evidenceResponse.json().catch(() => null);
+        if (!evidenceResponse.ok) {
+          throw new Error(
+            evidenceResult?.detail || "피드백은 저장됐지만 증거 파일 업로드에 실패했습니다.",
+          );
+        }
+      }
+
       setSubmitState("success");
       setMessage("피드백이 저장됐습니다. 검토 후 다음 화요일 업데이트에 반영됩니다.");
       setComment("");
+      setEvidenceImage(null);
+      setEvidenceVideo(null);
     } catch (error) {
       setSubmitState("error");
       setMessage(error.message);
@@ -124,6 +144,25 @@ function DashboardAlertFeedback({ cattle }) {
               placeholder="예: 실제로는 서 있었고 COW-013의 결과로 보입니다."
             />
           </label>
+
+          <div className="dashboard-feedback-files">
+            <label>
+              당시 이미지(선택)
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(event) => setEvidenceImage(event.target.files?.[0] || null)}
+              />
+            </label>
+            <label>
+              당시 영상 구간(선택)
+              <input
+                type="file"
+                accept="video/mp4,video/webm,video/quicktime"
+                onChange={(event) => setEvidenceVideo(event.target.files?.[0] || null)}
+              />
+            </label>
+          </div>
 
           {message && (
             <p className={`dashboard-feedback-message ${submitState}`} role="status">

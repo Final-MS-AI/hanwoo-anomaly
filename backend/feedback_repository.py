@@ -39,6 +39,7 @@ def create_feedback(record: dict[str, Any]) -> dict[str, Any]:
                     device_id,
                     triage_stage,
                     evidence_blob_name,
+                    video_blob_name,
                     feedback_fingerprint
                 )
                 VALUES (
@@ -60,6 +61,7 @@ def create_feedback(record: dict[str, Any]) -> dict[str, Any]:
                     %(device_id)s,
                     %(triage_stage)s,
                     %(evidence_blob_name)s,
+                    %(video_blob_name)s,
                     %(feedback_fingerprint)s
                 )
                 RETURNING id, job_id, feedback_type, review_status,
@@ -158,4 +160,28 @@ def resolve_feedback_context(
             )
             row = cursor.fetchone()
             return dict(row) if row else None
+
+
+def attach_feedback_media(
+    feedback_id: str,
+    user_id: int,
+    evidence_blob_name: str | None,
+    video_blob_name: str | None,
+) -> dict[str, Any] | None:
+    with psycopg.connect(_database_url(), row_factory=dict_row) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE model_feedback
+                SET evidence_blob_name=COALESCE(%s, evidence_blob_name),
+                    video_blob_name=COALESCE(%s, video_blob_name),
+                    updated_at=NOW()
+                WHERE id=%s AND user_id=%s
+                RETURNING id, evidence_blob_name, video_blob_name
+                """,
+                (evidence_blob_name, video_blob_name, feedback_id, user_id),
+            )
+            row = cursor.fetchone()
+        connection.commit()
+    return dict(row) if row else None
 

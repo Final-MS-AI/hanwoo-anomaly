@@ -1,0 +1,16 @@
+[Unit]
+Description=COWOW GPU feedback model trainer API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=azureuser
+WorkingDirectory=/home/azureuser/feedback-model-worker
+EnvironmentFile=/home/azureuser/feedback-model-worker/.env
+ExecStart=/home/azureuser/realtime-inference/.venv/bin/uvicorn feedback_model_worker:app --host 127.0.0.1 --port 8120
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

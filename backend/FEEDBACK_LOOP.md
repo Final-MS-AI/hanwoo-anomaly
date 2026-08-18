@@ -57,3 +57,20 @@ BEHAVIOR_THRESHOLDS = apply_policy_overrides(BEHAVIOR_THRESHOLDS)
 `FEEDBACK_PROMOTE_COMMAND` are command templates. They receive `{manifest}`,
 `{batch_id}`, and (for evaluate/promote) `{candidate}`. Leave auto promotion off
 until the candidate evaluation command is connected and verified.
+
+## GPU model retraining
+
+`wrong_behavior` reports with event-linked or user-uploaded media are sent to
+the GPU worker. The worker samples the video, detects the largest cow, stores
+only the cow crop, and keeps events separated between train and validation.
+Training starts only after `feeding`, `lying`, `standing`, and `walking` each
+have at least five distinct corrected events. The current production model and
+candidate are evaluated on exactly the same held-out events. Promotion requires
+non-decreasing accuracy and balanced accuracy, with no class recall regression
+larger than five percentage points. Before replacement, the worker backs up the
+production weights; then it atomically swaps the candidate and restarts only the
+realtime inference service.
+
+`false_anomaly` is intentionally not used as a behavior-class label. It means
+the observed behavior may be correct but the anomaly decision was wrong, so it
+continues to calibrate the anomaly policy instead of corrupting the classifier.
