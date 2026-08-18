@@ -896,14 +896,49 @@ function DashboardPage({ user, setUser }) {
       {location.pathname === "/inference" && <DemoVideoSelector />}
 
       {location.pathname === "/cattle/register" && (
-        <RegisterCattleModal
-          embedded
-          onClose={() => navigate("/dashboard")}
-          onRegistered={() => {
-            window.alert("소 등록이 완료되었습니다.");
-            navigate("/dashboard");
-          }}
-        />
+        <>
+          <div
+            style={{
+              margin: "16px 16px 0",
+              padding: "14px 16px",
+              border: "1px solid rgba(0,0,0,0.12)",
+              borderRadius: "12px",
+              background: "rgba(255,255,255,0.6)",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: "4px" }}>
+              급이대 구역이 지정되어 있나요?
+            </div>
+            <div style={{ fontSize: "0.86rem", opacity: 0.75, marginBottom: "10px" }}>
+              CCTV 화면에서 급이대 위치를 표시해야 개체 식별 결과가 트랙에 연결됩니다.
+              축사마다 한 번만 설정하면 됩니다.
+            </div>
+            
+            <a
+              href="/zone-setup.html"
+              style={{
+                display: "inline-block",
+                padding: "9px 16px",
+                borderRadius: "9px",
+                background: "#2f6f4f",
+                color: "#fff",
+                fontSize: "0.9rem",
+                fontWeight: 600,
+                textDecoration: "none",
+              }}
+            >
+              급이대 구역 지정하기 →
+            </a>
+          </div>
+          <RegisterCattleModal
+            embedded
+            onClose={() => navigate("/dashboard")}
+            onRegistered={() => {
+              window.alert("소 등록이 완료되었습니다.");
+              navigate("/dashboard");
+            }}
+          />
+        </>
       )}
 
       {location.pathname === "/chat" && <RagChatbot />}
