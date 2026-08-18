@@ -10,6 +10,10 @@ WorkingDirectory=/home/azureuser/realtime-inference
 EnvironmentFile=/home/azureuser/cowow-edge-credentials.env
 Environment=COWOW_INFERENCE_WS_URL=ws://127.0.0.1:8100/ws/top
 Environment=COWOW_CAMERA_ID=CAMERA-01
+Environment=COWOW_ANOMALY_TARGET_BEHAVIOR=lying
+Environment=COWOW_ANOMALY_EVENT_BEHAVIOR=long_lying
+Environment=COWOW_ANOMALY_WINDOW_SECONDS=300
+Environment=COWOW_ANOMALY_MIN_MATCH_RATIO=0.70
 Environment=COWOW_LYING_WARNING_SECONDS=300
 Environment=COWOW_EVENT_COOLDOWN_SECONDS=1800
 Environment=COWOW_EVENT_CLIP_SECONDS=10
@@ -19,5 +23,4 @@ RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
-
 
