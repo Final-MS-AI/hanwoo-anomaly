@@ -912,6 +912,7 @@ function DashboardPage({ user, setUser }) {
               축사마다 한 번만 설정하면 됩니다.
             </div>
             
+            <a
               href="/zone-setup.html"
               style={{
                 display: "inline-block",
