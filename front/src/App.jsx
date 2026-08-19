@@ -894,65 +894,9 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
       {location.pathname === "/inference" && (
-        <div
-          style={{
-            background: "#fff",
-            borderRadius: "16px",
-            padding: "28px",
-            margin: "16px",
-            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          }}
-        >
-          <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "20px" }}>
-            급이대 구역 지정하기
-          </div>
-          <div
-            style={{
-              border: "1px dashed rgba(180,150,100,0.5)",
-              borderRadius: "12px",
-              padding: "18px",
-              marginBottom: "16px",
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: "6px" }}>CCTV 화면 캡처</div>
-            <div style={{ fontSize: "0.85rem", opacity: 0.7, lineHeight: 1.6 }}>
-              축사 CCTV 화면을 캡처한 이미지를 준비해 주세요. 급이대 전체가 보이는
-              각도여야 합니다.
-            </div>
-          </div>
-          <div
-            style={{
-              border: "1px dashed rgba(180,150,100,0.5)",
-              borderRadius: "12px",
-              padding: "18px",
-              marginBottom: "24px",
-            }}
-          >
-            <div style={{ fontWeight: 600, marginBottom: "6px" }}>구역 표시</div>
-            <div style={{ fontSize: "0.85rem", opacity: 0.7, lineHeight: 1.6 }}>
-              화면에서 급이대 위치를 클릭해 다각형으로 표시합니다. 개체 식별 결과를
-              트랙에 연결하는 데 사용되며, 축사마다 한 번만 설정하면 됩니다.
-            </div>
-          </div>
-          
-          <a
-            href="/zone-setup.html"
-            style={{
-              display: "block",
-              width: "100%",
-              padding: "15px",
-              borderRadius: "10px",
-              background: "#2f6f4f",
-              color: "#fff",
-              fontSize: "1rem",
-              fontWeight: 700,
-              textAlign: "center",
-              textDecoration: "none",
-              boxSizing: "border-box",
-            }}
-          >
-            구역 지정 화면 열기 →
-          </a>
+        <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", margin: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+          <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "16px" }}>급이대 구역 지정하기</div>
+          <iframe src="/zone-setup.html" title="급이대 구역 지정" style={{ width: "100%", height: "1400px", border: "none", borderRadius: "12px", display: "block" }} />
         </div>
       )}
       {location.pathname === "/cattle/register" && (
