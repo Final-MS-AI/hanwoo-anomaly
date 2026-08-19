@@ -8,8 +8,8 @@ const navigationItems = [
   },
   {
     to: "/inference",
-    icon: "▶",
-    label: "영상 분석",
+    icon: "⬚",
+    label: "구역 지정",
   },
   {
     to: "/cattle/register",
