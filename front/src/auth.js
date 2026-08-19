@@ -2,8 +2,11 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://hanwoo.koreacentral.cloudapp.azure.com";
 
+// OAuth Client ID is not a secret. The fallback keeps Google login available
+// when a static deployment was built without VITE_GOOGLE_CLIENT_ID.
 export const GOOGLE_CLIENT_ID =
-  import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ??
+  "303459689220-bkuu4frgrdkil3mcp8632th1j105kkv5.apps.googleusercontent.com";
 
 export function hasAndroidAuthBridge() {
   return (
