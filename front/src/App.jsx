@@ -896,7 +896,22 @@ function DashboardPage({ user, setUser }) {
       {location.pathname === "/inference" && (
         <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", margin: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "16px" }}>급이대 구역 지정하기</div>
-          <iframe src="/zone-setup.html" title="급이대 구역 지정" style={{ width: "100%", height: "1400px", border: "none", borderRadius: "12px", display: "block" }} />
+          <iframe
+            src="/zone-setup.html"
+            title="급이대 구역 지정"
+            scrolling="no"
+            onLoad={(ev) => {
+              const fit = () => {
+                try {
+                  const d = ev.target.contentWindow.document;
+                  ev.target.style.height = d.documentElement.scrollHeight + "px";
+                } catch (err) {}
+              };
+              fit();
+              setInterval(fit, 500);
+            }}
+            style={{ width: "100%", height: "600px", border: "none", borderRadius: "12px", display: "block", overflow: "hidden" }}
+          />
         </div>
       )}
       {location.pathname === "/cattle/register" && (
