@@ -212,3 +212,134 @@ NULL 인 행은 이 인덱스로 막히지 않는다. `track_load.py` 는 항상
 
 **DB 를 조작할 때는 `import psycopg as pg` 를 쓸 것.** venv 에 `psycopg2` 는
 없다 (psycopg 3.3.4). 이 검사 도구도 같은 규약을 따른다.
+
+### 17.9 ★ 정적 페이지 배포 — 별도 루트를 쓴다 (2026-08-18)
+
+`zone-setup.html` 과 `muzzle-timeline.html` 은 **`/var/www/hanwoo-static/` 에 있다.**
+`/var/www/hanwoo/` 가 아니다.
+
+이유는 하나다. 프론트 배포가 `rsync -a --delete dist/ /var/www/hanwoo/` 이고,
+이 명령은 **`dist` 에 없는 파일을 정의상 제거한다.** 8/17 에 `/var/www/hanwoo/` 에
+직접 올린 두 장이 그날 밤 배포로 삭제됐다.
+
+Caddyfile 에서 `handle /devices/*` 와 최종 `handle` 사이에 다음이 있다.
+
+    @muzzleStatic path /zone-setup.html /muzzle-timeline.html
+    handle @muzzleStatic {
+            root * /var/www/hanwoo-static
+            file_server
+    }
+
+**URL 은 바뀌지 않았다.** 갱신은 `sudo cp` 한 줄이고, React 재빌드가 필요 없다.
+
+### 17.10 ★★ SPA 폴백에서 상태 코드는 존재 증명이 아니다
+
+최종 `handle` 블록에 `try_files {path} /index.html` 이 있다. **파일이 없어도
+200 이 나오고, 내용은 React 껍데기(495 bytes)다.**
+
+    curl -o /dev/null -w "%{http_code}"  ->  200      <- 파일이 없어도 이렇게 나온다
+    curl ... | wc -c                     ->  495      <- 이것이 진실
+
+8/17 배포 확인이 이 방식으로 통과했고, 그날 밤 파일이 삭제된 뒤에도 계속 200 이
+나왔다. **하루 동안 소실을 탐지하지 못했다.**
+
+검증은 반드시 **바이트 수 또는 내용**으로 한다.
+
+    local=$(wc -c < ~/hanwoo-yeri/muzzle/tools/zone_setup.html)
+    served=$(curl -s https://hanwoo.koreacentral.cloudapp.azure.com/zone-setup.html | wc -c)
+    # local == served 여야 한다. 495 면 폴백이다.
+
+같은 현상이 Azure Static Web Apps 에서도 재현된다. SWA 에는 이 정적 파일이 없으므로
+링크를 눌러도 `navigationFallback` 이 대시보드를 띄운다. **버튼 동작 확인은 VM 에서만
+유효하다.**
+
+### 17.11 프론트 배포 판단 — 해시 판별식
+
+VM(`/var/www/hanwoo`)은 자동 배포가 없다. 손으로 빌드·`rsync` 해야 하고, **지금
+배포본에 커밋되지 않은 작업이 섞여 있으면 내가 배포하는 순간 그것이 사라진다.**
+
+Vite 자산 파일명은 내용 해시다. 이것으로 측정한다.
+
+    cd ~/hanwoo-yeri/front && npm run build
+    ls dist/assets/*.js
+    curl -s https://hanwoo.koreacentral.cloudapp.azure.com/ | grep -o 'index-[A-Za-z0-9_-]*\.js'
+
+| 결과 | 의미 | 조치 |
+|---|---|---|
+| 일치 | 배포본 = 깨끗한 main | 배포해도 잃는 것이 없다 |
+| 불일치 | 미커밋 작업이 프로덕션에 있다 | 배포하면 사라진다 |
+
+**배포는 `--delete` 없이 한다.** Vite 자산은 해시 파일명이라 덮어써도 충돌하지 않고,
+지우면 손으로 올린 파일이 함께 날아간다. 배포 전 `sudo cp -a` 로 백업한다.
+
+**배포해도 팀원 소스는 무손상이다.** 배포는 빌드 산출물을 웹서버 폴더에 복사하는
+것이고 git 작업 폴더를 건드리지 않는다. 화면에 보이는 번들만 바뀐다.
+
+### 17.12 프론트 화면 확인은 API 가 붙은 환경에서만 된다
+
+`npm run preview` 는 API 를 프록시하지 않는다. `getCurrentUser()` 가 실패해
+`user` 가 `undefined` 로 남고 로딩 화면에서 멈춘다. 게이트를 임시로 꺼도 그 뒤
+화면이 API 에 의존하면 같은 벽에 부딪힌다.
+
+**우회로가 없다.** VM 배포 또는 팀원 배포를 기다린다.
+
+### 17.13 ★ 구역 지정 화면은 iframe 으로 임베드돼 있다 (2026-08-19)
+
+`/inference` 탭(하단 라벨 **구역 지정**)이 `zone-setup.html` 을 iframe 으로
+품고 있다. 버튼으로 페이지를 넘기던 방식에서 바뀌었다.
+
+**왜 포팅하지 않았나.** 캔버스를 React 컴포넌트로 옮기면 8/17 에 실측 검증한
+다각형 좌표계·422 거부 검사·판정 기준점 로직을 **전부 재증명**해야 한다.
+같은 오리진 iframe 은 그 코드를 한 글자도 건드리지 않고 앱 안으로 들여온다.
+WebView 에서도 같은 오리진 문서라 그대로 뜬다.
+
+**경로는 `/inference` 그대로다.** 하단 탭의 라벨과 아이콘만 바꿨다. 경로를
+바꾸면 라우트 정의·북마크·앱 딥링크가 전부 영향을 받는다.
+
+**임베드 때문에 정적 파일에서 제거한 것들**
+
+- `<div class="top">` — 로고와 복귀 링크. 바깥 카드가 이미 제목을 갖고 있어
+  액자 속 액자가 된다. 특히 복귀 링크는 누르면 **iframe 안에 대시보드가 또
+  열린다.** 하단 탭이 이동을 담당하므로 역할이 없다.
+- `<div class="steps">` — 1/2/3 단계 표시. 같은 이유.
+
+**높이는 두 층에서 관리한다.**
+
+바깥: `onLoad` 에서 `contentWindow.document.documentElement.scrollHeight` 를
+읽어 iframe 높이를 맞추고, 이미지 업로드로 캔버스가 커질 때를 위해 주기 갱신한다.
+
+안쪽: 그것만으로는 여백이 남는다. **계산 대상인 문서 자체가 `min-height` 와
+하단 패딩을 갖고 있기 때문이다.** `<style id="embed-fit">` 로 이를 무력화한다.
+
+    html, body { min-height: 0 !important; height: auto !important; padding: 0 !important; }
+    .wrap { min-height: 0 !important; padding-bottom: 0 !important; overflow: hidden; }
+
+### 17.14 ★★ 검증 명령을 `&&` 로 잇지 않는다
+
+두 방향으로 거짓 결과가 나온다.
+
+**파이프는 실패를 숨긴다.** `npm run build 2>&1 | head -14 && git commit ...` 은
+파이프의 종료 코드가 `head` 것이라 **빌드가 실패해도 커밋·push 가 진행된다.**
+실제로 JSX 오류가 있는 코드가 PR 까지 올라갔다.
+
+**`grep -c` 는 0 일 때 실패 종료 코드를 낸다.** 체인 중간에 두면 뒤 명령이
+실행되지 않는데, `$(...)` 는 먼저 평가되므로 **이전 실행이 남긴 로그 파일을 읽어
+"빌드 성공"을 출력**한다.
+
+올바른 형태 — 한 줄씩 독립 실행한다.
+
+    cd ~/hanwoo-yeri/front
+    npm run build > /tmp/b.log 2>&1
+    grep -c "built in" /tmp/b.log     # 1 이어야 함
+    head -16 /tmp/b.log               # 0 이면 여기에 원인이 있다
+
+### 17.15 프론트 배포는 여러 사람이 손으로 한다 — 덮어쓰기가 일어난다
+
+VM(`/var/www/hanwoo`)은 자동 배포가 없다. **내가 배포해도 몇 분 뒤 다른 사람의
+빌드로 덮인다.** 화면이 옛 버전으로 보이면 "코드가 안 들어갔다"고 판단하기 전에
+**누가 그사이 배포했는지**를 먼저 의심한다.
+
+해시 판별식(§17.11)은 "지금 무엇이 올라가 있는가"를 재는 도구이지 덮어쓰기를
+막지는 못한다. **배포 전 공유가 유일한 대책이다.**
+
+`/var/www/hanwoo-static/` 의 정적 파일은 이 문제에서 자유롭다(§17.9).
