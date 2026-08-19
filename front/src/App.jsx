@@ -893,9 +893,7 @@ function DashboardPage({ user, setUser }) {
       </header>
 
       {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
-      {location.pathname === "/inference" && <DemoVideoSelector />}
-
-      {location.pathname === "/cattle/register" && (
+      {location.pathname === "/inference" && (
         <>
           <div
             style={{
@@ -907,14 +905,13 @@ function DashboardPage({ user, setUser }) {
             }}
           >
             <div style={{ fontWeight: 600, marginBottom: "4px" }}>
-              급이대 구역이 지정되어 있나요?
+              영상 분석 전에 급이대 구역을 지정해주세요
             </div>
             <div style={{ fontSize: "0.86rem", opacity: 0.75, marginBottom: "10px" }}>
               CCTV 화면에서 급이대 위치를 표시해야 개체 식별 결과가 트랙에 연결됩니다.
               축사마다 한 번만 설정하면 됩니다.
             </div>
             
-            <a
               href="/zone-setup.html"
               style={{
                 display: "inline-block",
@@ -930,7 +927,11 @@ function DashboardPage({ user, setUser }) {
               급이대 구역 지정하기 →
             </a>
           </div>
-          <RegisterCattleModal
+          <DemoVideoSelector />
+        </>
+      )}
+      {location.pathname === "/cattle/register" && (
+        <RegisterCattleModal
             embedded
             onClose={() => navigate("/dashboard")}
             onRegistered={() => {
@@ -938,7 +939,6 @@ function DashboardPage({ user, setUser }) {
               navigate("/dashboard");
             }}
           />
-        </>
       )}
 
       {location.pathname === "/chat" && <RagChatbot />}
