@@ -438,10 +438,21 @@
 }
 
 .bottom-navigation-icon {
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
   margin-bottom: 3px;
-  font-size: 23px;
   line-height: 1;
+  flex-shrink: 0;
+}
+
+.bottom-navigation-icon svg {
+  display: block;
+  width: 21px;
+  height: 21px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 640px) {
