@@ -5,7 +5,7 @@ import DeviceSharingPanel from "./DeviceSharingPanel.jsx";
 const CONTROL_API_URL =
   import.meta.env.VITE_CONTROL_API_URL ??
   import.meta.env.VITE_API_BASE_URL ??
-  "";
+  "https://hanwoo.koreacentral.cloudapp.azure.com";
 const DEVICE_STORAGE_KEY = "cowowRegisteredDevice";
 const COWOW_0001_LIVE_VIEW_URL =
   import.meta.env.VITE_LIVE_VIEW_URL ??

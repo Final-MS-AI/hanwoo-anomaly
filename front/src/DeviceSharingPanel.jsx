@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 const API_BASE_URL =
   import.meta.env.VITE_DEVICE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  "";
+  "https://hanwoo.koreacentral.cloudapp.azure.com";
 
 function DeviceSharingPanel({ device }) {
   const [isOpen, setIsOpen] = useState(false);
