@@ -366,7 +366,7 @@
 /* 소 등록 독립 페이지 */
 
 .register-page-container {
-  width: min(760px, calc(100% - 32px));
+  width: min(1120px, calc(100% - 32px));
   margin: 0 auto 50px;
 }
 
