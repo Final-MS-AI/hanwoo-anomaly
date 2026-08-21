@@ -1573,8 +1573,9 @@
     font-size: 10px;
   }
 
-  .bottom-navigation-icon {
-    font-size: 19px;
+  .bottom-navigation-icon svg {
+    width: 19px;
+    height: 19px;
   }
 
   .inference-section {
