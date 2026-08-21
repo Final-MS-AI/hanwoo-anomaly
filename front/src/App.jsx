@@ -894,7 +894,17 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
       {location.pathname === "/inference" && (
-        <div style={{ background: "#fff", borderRadius: "16px", padding: "20px", margin: "16px", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
+        <div
+          style={{
+            background: "#fff",
+            borderRadius: "16px",
+            padding: "20px",
+            margin: "16px auto",
+            width: "min(1120px, calc(100% - 48px))",
+            boxSizing: "border-box",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+          }}
+        >
           <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "16px" }}>급이대 구역 지정하기</div>
           <iframe
             src="/zone-setup.html"

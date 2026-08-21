@@ -5,11 +5,11 @@
 
 .bottom-navigation {
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  width: min(720px, calc(100% - 32px));
+  width: min(1120px, calc(100% - 48px));
 }
 
 .environment-control-page {
-  width: min(1000px, calc(100% - 48px));
+  width: min(1120px, calc(100% - 48px));
   margin: 28px auto 24px;
   padding: 28px;
   background: #fff;
@@ -1052,7 +1052,7 @@
 .rag-chat-page {
   display: flex;
   flex-direction: column;
-  width: min(760px, calc(100% - 48px));
+  width: min(1120px, calc(100% - 48px));
   min-width: 0;
   min-height: 700px;
   margin: 28px auto 24px;
