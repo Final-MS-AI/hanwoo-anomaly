@@ -7,14 +7,16 @@ import os
 
 import psycopg
 from dotenv import load_dotenv
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from admin_auth import require_admin
 
 load_dotenv("/home/azureuser/muzzle_api/.env")
 DSN = os.getenv("DATABASE_URL")
 
 OPER_THRESHOLD = 0.70   # THRESHOLD_POLICY.md 실영상 운영 임계값
 
-router = APIRouter(tags=["tracks"])
+router = APIRouter(tags=["tracks"], dependencies=[Depends(require_admin)])
 
 
 def conn():

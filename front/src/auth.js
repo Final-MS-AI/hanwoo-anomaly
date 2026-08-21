@@ -99,6 +99,16 @@ export async function createGuestSession() {
   return normalizeUser(await parseResponse(response));
 }
 
+export async function createAdminSession(username, password) {
+  const response = await fetch(`${API_BASE_URL}/auth/admin-login`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username, password }),
+  });
+  return normalizeUser(await parseResponse(response));
+}
+
 export async function getCurrentUser({ signal } = {}) {
   const response = await fetch(`${API_BASE_URL}/auth/me`, {
     method: "GET",
