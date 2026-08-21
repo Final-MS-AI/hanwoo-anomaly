@@ -6,8 +6,10 @@ import AbnormalCattleDashboard from "./AbnormalCattleDashboard.jsx";
 import RagChatbot from "./RagChatbot.jsx";
 import BarnEnvironmentControl from "./BarnEnvironmentControl.jsx";
 import DeviceSetupPage from "./DeviceSetupPage.jsx";
+import AdminPage from "./AdminPage.jsx";
 import {
   createGuestSession,
+  createAdminSession,
   exchangeGoogleCredential,
   getCurrentUser,
   GOOGLE_CLIENT_ID,
@@ -37,9 +39,13 @@ const MUZZLE_CONSISTENCY_THRESHOLD = 0.45;
 
 function LoginPage({ user, setUser }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [adminUsername, setAdminUsername] = useState("");
+  const [adminPassword, setAdminPassword] = useState("");
   const isAndroidApp = hasAndroidAuthBridge();
+  const isAdminLogin = location.state?.from === "/admin";
 
   const completeGoogleLogin = useCallback(
     async (credential) => {
@@ -57,7 +63,7 @@ function LoginPage({ user, setUser }) {
         setUser(authenticatedUser);
 
         setErrorMessage("");
-        navigate("/dashboard");
+        navigate(location.state?.from ?? "/dashboard");
       } catch (error) {
         console.error("Google login error:", error);
 
@@ -123,10 +129,25 @@ function LoginPage({ user, setUser }) {
 
       const guestUser = await createGuestSession();
       setUser(guestUser);
-      navigate("/dashboard");
+    navigate(location.state?.from ?? "/dashboard");
     } catch (error) {
       console.error("Guest login error:", error);
       setErrorMessage(error.message ?? "게스트 로그인에 실패했습니다.");
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleAdminLogin = async (event) => {
+    event.preventDefault();
+    try {
+      setErrorMessage("");
+      setIsLoggingIn(true);
+      const adminUser = await createAdminSession(adminUsername, adminPassword);
+      setUser(adminUser);
+      navigate(location.state?.from ?? "/admin");
+    } catch (error) {
+      setErrorMessage(error.message ?? "관리자 로그인에 실패했습니다.");
     } finally {
       setIsLoggingIn(false);
     }
@@ -208,18 +229,32 @@ function LoginPage({ user, setUser }) {
           </button>
         </div>
 
-        <div className="login-divider">
-          <span>또는</span>
-        </div>
+        {!isAdminLogin && (
+          <div className="login-divider">
+            <span>또는</span>
+          </div>
+        )}
 
-        <button
-          className="guest-login-button"
-          type="button"
-          onClick={handleGuestLogin}
-          disabled={isLoggingIn}
-        >
-          {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
-        </button>
+        {!isAdminLogin && (
+          <button
+            className="guest-login-button"
+            type="button"
+            onClick={handleGuestLogin}
+            disabled={isLoggingIn}
+          >
+            {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
+          </button>
+        )}
+
+        {isAdminLogin && (
+          <>
+            <form className="admin-login-form" onSubmit={handleAdminLogin}>
+              <input value={adminUsername} onChange={(event) => setAdminUsername(event.target.value)} placeholder="관리자 아이디" autoComplete="username" required />
+              <input value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} placeholder="비밀번호" type="password" autoComplete="current-password" required />
+              <button type="submit" disabled={isLoggingIn}>{isLoggingIn ? "로그인 중…" : "관리자로 로그인"}</button>
+            </form>
+          </>
+        )}
 
         {errorMessage && <p className="error-message">{errorMessage}</p>}
       </section>
@@ -808,7 +843,11 @@ function DashboardPage({ user, setUser }) {
   }, [location.pathname]);
 
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />;
+  }
+
+  if (location.pathname === "/admin") {
+    return <AdminPage />;
   }
 
   const handleLogout = async () => {
@@ -1012,6 +1051,11 @@ function App() {
 
       <Route
         path="/devices/setup"
+        element={<DashboardPage user={user} setUser={setUser} />}
+      />
+
+      <Route
+        path="/admin"
         element={<DashboardPage user={user} setUser={setUser} />}
       />
 

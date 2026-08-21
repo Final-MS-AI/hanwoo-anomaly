@@ -1704,3 +1704,4 @@ h1 {
   font-size: 12px;
   line-height: 1.5;
 }
+.admin-login-divider{display:flex;align-items:center;gap:10px;margin:20px 0 12px;color:#9a8d80;font-size:11px}.admin-login-divider:before,.admin-login-divider:after{content:"";height:1px;flex:1;background:#e7ded5}.admin-login-form{display:grid;gap:8px;margin-top:28px}.admin-login-form input{width:100%;padding:11px 12px;border:1px solid #ded3c8;border-radius:8px;background:#fffaf5;font-size:13px;outline:none}.admin-login-form input:focus{border-color:#7e9a82;box-shadow:0 0 0 3px #7e9a821a}.admin-login-form button{width:100%;padding:11px 14px;border:0;border-radius:8px;background:#314f3a;color:#fff;font-size:13px;font-weight:700;cursor:pointer}.admin-login-form button:disabled{opacity:.6;cursor:wait}

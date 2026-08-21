@@ -21,6 +21,10 @@ data/
 *.mp4
 crops/
 
+# Local test/demo scripts — do not publish
+muzzle/api/run_test.sh
+muzzle/tools/enroll_demo.sh
+
 # Backend local environment
 backend/.env
 
