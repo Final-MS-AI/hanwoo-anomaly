@@ -153,8 +153,13 @@ function LoginPage({ user, setUser }) {
     }
   };
 
-  if (user) {
-    return <Navigate to="/dashboard" replace />;
+  if (user && !(isAdminLogin && user.loginType !== "admin")) {
+    return (
+      <Navigate
+        to={user.loginType === "admin" ? "/admin" : "/dashboard"}
+        replace
+      />
+    );
   }
 
   return (
@@ -847,6 +852,9 @@ function DashboardPage({ user, setUser }) {
   }
 
   if (location.pathname === "/admin") {
+    if (user.loginType !== "admin") {
+      return <Navigate to="/login" state={{ from: "/admin" }} replace />;
+    }
     return <AdminPage />;
   }
 
