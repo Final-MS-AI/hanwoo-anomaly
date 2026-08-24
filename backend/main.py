@@ -23,6 +23,7 @@ from feedback_api import router as feedback_router
 from dashboard_api import router as dashboard_router
 from admin_auth import router as admin_auth_router
 from admin_login import router as admin_login_router
+from admin_notifications import router as admin_notifications_router
 
 # ---------------------------------------------------------
 # 환경변수 로딩
@@ -102,6 +103,7 @@ app.include_router(feedback_router)
 app.include_router(dashboard_router)
 app.include_router(admin_auth_router)
 app.include_router(admin_login_router)
+app.include_router(admin_notifications_router)
 
 
 # ---------------------------------------------------------

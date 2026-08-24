@@ -15,6 +15,11 @@ hanwoo.koreacentral.cloudapp.azure.com {
 		reverse_proxy 127.0.0.1:8000
 	}
 
+	# 관리자 API는 정적 프론트 fallback보다 먼저 백엔드로 전달한다.
+	handle /admin/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
 	handle /inference/* {
 		reverse_proxy 127.0.0.1:8000
 	}
