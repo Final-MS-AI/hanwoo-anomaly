@@ -76,7 +76,10 @@ function BarnEnvironmentControl() {
   const navigate = useNavigate();
   const [device, setDevice] = useState(() => {
     try {
-      return JSON.parse(localStorage.getItem(DEVICE_STORAGE_KEY)) ?? null;
+      // Browser storage is shared across Google/Kakao/Naver logins. Only the
+      // guest demo may use a local cache; social accounts use /devices/mine.
+      const cachedDevice = JSON.parse(localStorage.getItem(DEVICE_STORAGE_KEY));
+      return cachedDevice?.accountScope === "guest" ? cachedDevice : null;
     } catch {
       return null;
     }
@@ -134,16 +137,17 @@ function BarnEnvironmentControl() {
         return data.devices?.[0] ?? null;
       })
       .then((registeredDevice) => {
-        if (!registeredDevice) return;
-
+        if (!registeredDevice && device?.accountScope === "guest") {
+          return;
+        }
+        // The backend result is account-scoped. Discard a prior login's cache.
+        localStorage.removeItem(DEVICE_STORAGE_KEY);
         setDevice(registeredDevice);
-        localStorage.setItem(
-          DEVICE_STORAGE_KEY,
-          JSON.stringify(registeredDevice),
-        );
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
+          localStorage.removeItem(DEVICE_STORAGE_KEY);
+          setDevice(null);
           console.error("Registered device error:", error);
         }
       });

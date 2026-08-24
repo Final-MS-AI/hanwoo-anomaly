@@ -879,6 +879,7 @@ function DashboardPage({ user, setUser }) {
     } catch (error) {
       console.error("Logout error:", error);
     } finally {
+      localStorage.removeItem("cowowRegisteredDevice");
       setUser(null);
       navigate("/login", { replace: true });
     }

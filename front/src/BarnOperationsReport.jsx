@@ -177,13 +177,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
           signal: controller.signal,
         });
         const devices = await devicesResponse.json();
-        let savedDevice = null;
-        try {
-          savedDevice = JSON.parse(localStorage.getItem("cowowRegisteredDevice"));
-        } catch {
-          savedDevice = null;
-        }
-        const device = devices?.devices?.[0] ?? savedDevice;
+        const device = devices?.devices?.[0] ?? null;
         if (!devicesResponse.ok || !device?.deviceId) {
           throw new Error("연결된 환경 장비 정보가 없습니다.");
         }

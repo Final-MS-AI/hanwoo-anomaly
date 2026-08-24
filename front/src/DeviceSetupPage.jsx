@@ -156,13 +156,18 @@ function DeviceSetupPage({ user }) {
         registeredDevice = { ...registeredDevice, ...data.device };
       }
 
-      localStorage.setItem(
-        DEVICE_STORAGE_KEY,
-        JSON.stringify({
-          ...registeredDevice,
-          registeredAt: new Date().toISOString(),
-        }),
-      );
+      if (isGuest) {
+        localStorage.setItem(
+          DEVICE_STORAGE_KEY,
+          JSON.stringify({
+            ...registeredDevice,
+            accountScope: "guest",
+            registeredAt: new Date().toISOString(),
+          }),
+        );
+      } else {
+        localStorage.removeItem(DEVICE_STORAGE_KEY);
+      }
 
       navigate("/control", { replace: true });
     } catch (error) {
@@ -198,13 +203,7 @@ function DeviceSetupPage({ user }) {
         throw new Error(data.detail ?? "가족 공유 장비 연결에 실패했습니다.");
       }
 
-      localStorage.setItem(
-        DEVICE_STORAGE_KEY,
-        JSON.stringify({
-          ...data.device,
-          registeredAt: new Date().toISOString(),
-        }),
-      );
+      localStorage.removeItem(DEVICE_STORAGE_KEY);
 
       navigate("/control", { replace: true });
     } catch (error) {
