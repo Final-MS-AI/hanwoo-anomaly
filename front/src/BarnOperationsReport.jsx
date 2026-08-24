@@ -72,6 +72,40 @@ function actuatorName(value) {
   return { ventilation_fan: "환기 팬", water_sprayer: "살수 장치", humidifier: "가습 장치" }[value] || value;
 }
 
+function printReport() {
+  const report = document.querySelector(".operations-report");
+  if (!report) return;
+
+  // Print a document containing only the report. Printing the SPA modal itself
+  // leaves its fixed backdrop/layout in Chrome's print tree and causes blank pages.
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  const stylesheets = [...document.querySelectorAll('link[rel="stylesheet"]')]
+    .map((link) => `<link rel="stylesheet" href="${link.href}">`)
+    .join("");
+
+  printWindow.document.write(`<!doctype html>
+    <html lang="ko"><head><meta charset="utf-8"><title>COWOW 축사 운영 보고서</title>
+    ${stylesheets}
+    <style>
+      @page { size: A4 portrait; margin: 12mm; }
+      html, body { margin: 0; padding: 0; background: #fff; }
+      body { color: #281d14; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .operations-report { width: auto; max-width: none; margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; }
+      .operations-report-actions { display: none !important; }
+      .operations-report-header, .report-overview, .report-history-detail > div, .report-cattle-item { break-inside: avoid; page-break-inside: avoid; }
+      .report-section-heading { break-after: avoid; page-break-after: avoid; }
+      .report-section { margin-top: 16px; }
+    </style></head><body>${report.outerHTML}
+    <script>window.addEventListener('load', () => setTimeout(() => { window.focus(); window.print(); }, 250));</script>
+    </body></html>`);
+  printWindow.document.close();
+}
+
 function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const [deviceState, setDeviceState] = useState(null);
   const [reportData, setReportData] = useState(null);
@@ -164,7 +198,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
             <p>ESP32가 연결된 기간 동안 누적한 센서·제어·이상행동 이력을 기반으로 작성되었습니다.</p>
           </div>
           <div className="operations-report-actions">
-            <button type="button" onClick={() => window.print()}>인쇄 / PDF 저장</button>
+            <button type="button" onClick={printReport}>인쇄 / PDF 저장</button>
             <button type="button" className="report-close" onClick={onClose}>닫기</button>
           </div>
         </header>
