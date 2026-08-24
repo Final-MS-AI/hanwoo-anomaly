@@ -307,26 +307,61 @@ function MembersWorkspace() {
   const [members, setMembers] = useState([]);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("success");
+  const [isAdding, setIsAdding] = useState(false);
   useEffect(() => {
     if (!message) return undefined;
     const timer = window.setTimeout(() => setMessage(""), 3500);
     return () => window.clearTimeout(timer);
   }, [message]);
-  const loadMembers = () => fetch(`${ADMIN_API}/admin/users`, { credentials: "include" }).then((response) => response.json()).then((payload) => setMembers(payload.users || [])).catch(() => setMessage("관리자 목록을 불러오지 못했습니다."));
+  const request = async (url, options = {}) => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
+    try {
+      return await fetch(url, { ...options, credentials: "include", signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  };
+  const loadMembers = async () => {
+    try {
+      const response = await request(`${ADMIN_API}/admin/users`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+      setMembers(payload.users || []);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.name === "AbortError" ? "관리자 목록 조회 시간이 초과되었습니다." : "관리자 목록을 불러오지 못했습니다.");
+    }
+  };
   useEffect(() => { loadMembers(); }, []);
   const addMember = async (event) => {
     event.preventDefault();
-    const response = await fetch(`${ADMIN_API}/admin/users/by-email?email=${encodeURIComponent(email)}`, { method: "POST", credentials: "include" });
-    const payload = await response.json().catch(() => ({}));
-    setMessage(response.ok ? "관리자를 추가했습니다." : (payload.detail || "관리자 추가에 실패했습니다."));
-    if (response.ok) { setEmail(""); loadMembers(); }
+    if (isAdding) return;
+    setIsAdding(true);
+    setMessage("");
+    try {
+      const response = await request(`${ADMIN_API}/admin/users/by-email?email=${encodeURIComponent(email.trim())}`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "관리자 추가에 실패했습니다.");
+      setMessageType("success");
+      setMessage("관리자를 추가했습니다.");
+      setEmail("");
+      await loadMembers();
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.name === "AbortError" ? "관리자 추가 시간이 초과되었습니다. 서버 상태를 확인하세요." : error.message);
+    } finally {
+      setIsAdding(false);
+    }
   };
   const removeMember = async (id) => {
-    const response = await fetch(`${ADMIN_API}/admin/users/${id}`, { method: "DELETE", credentials: "include" });
+    const response = await request(`${ADMIN_API}/admin/users/${id}`, { method: "DELETE" });
+    setMessageType(response.ok ? "success" : "error");
     setMessage(response.ok ? "관리자 권한을 해제했습니다." : "관리자 권한 해제에 실패했습니다.");
     if (response.ok) loadMembers();
   };
-  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" required /><button className="primary-button" type="submit">+ 관리자 추가</button></form>{message && <p className="binding-message success" role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)}>해제</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)}>해제</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
 }
 
 function LoopCard({ tracks, setActiveNav }) {

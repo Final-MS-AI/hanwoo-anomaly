@@ -70,6 +70,18 @@ def list_admin_users(admin=Depends(require_admin)):
     return {"users": [{"id": r[0], "name": r[1], "email": r[2], "granted_at": r[3]} for r in rows]}
 
 
+@router.post("/users/by-email")
+def grant_admin_by_email(email: str = Query(..., min_length=3), admin=Depends(require_admin)):
+    database_url = os.getenv("DATABASE_URL")
+    with psycopg.connect(database_url) as connection:
+        row = connection.execute(
+            "SELECT id FROM public.users WHERE lower(email)=lower(%s) LIMIT 1", (email.strip(),)
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "해당 이메일로 가입한 사용자를 찾을 수 없습니다.")
+    return grant_admin(row[0], admin)
+
+
 @router.post("/users/{user_id}")
 def grant_admin(user_id: int, admin=Depends(require_admin)):
     database_url = os.getenv("DATABASE_URL")
@@ -89,18 +101,6 @@ def grant_admin(user_id: int, admin=Depends(require_admin)):
         event_key=f"admin-granted:{user_id}",
     )
     return {"user_id": user_id, "status": "admin"}
-
-
-@router.post("/users/by-email")
-def grant_admin_by_email(email: str = Query(..., min_length=3), admin=Depends(require_admin)):
-    database_url = os.getenv("DATABASE_URL")
-    with psycopg.connect(database_url) as connection:
-        row = connection.execute(
-            "SELECT id FROM public.users WHERE lower(email)=lower(%s) LIMIT 1", (email.strip(),)
-        ).fetchone()
-    if not row:
-        raise HTTPException(404, "해당 이메일로 가입한 사용자를 찾을 수 없습니다.")
-    return grant_admin(row[0], admin)
 
 
 @router.delete("/users/{user_id}")
