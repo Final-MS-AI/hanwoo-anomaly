@@ -155,7 +155,7 @@ function AbnormalCattleDashboard() {
         </div>
         <div className="dashboard-header-actions">
           <button className="dashboard-report-button" type="button" onClick={() => setIsReportOpen(true)}>
-            운영 보고서 만들기
+            보고서 만들기
           </button>
           <span className="dashboard-update-time">
             {isLoading
