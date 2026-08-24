@@ -63,11 +63,14 @@ def list_admin_users(admin=Depends(require_admin)):
     database_url = os.getenv("DATABASE_URL")
     with psycopg.connect(database_url) as connection:
         rows = connection.execute(
-            """SELECT u.id, u.name, u.email, a.granted_at
+            """SELECT u.id, u.name, u.email, u.provider, a.granted_at
                FROM public.admin_users a JOIN public.users u ON u.id=a.user_id
                ORDER BY a.granted_at"""
         ).fetchall()
-    return {"users": [{"id": r[0], "name": r[1], "email": r[2], "granted_at": r[3]} for r in rows]}
+    return {
+        "can_revoke": admin["provider"] == "admin",
+        "users": [{"id": r[0], "name": r[1], "email": r[2], "provider": r[3], "granted_at": r[4]} for r in rows],
+    }
 
 
 @router.post("/users/by-email")
@@ -105,10 +108,17 @@ def grant_admin(user_id: int, admin=Depends(require_admin)):
 
 @router.delete("/users/{user_id}")
 def revoke_admin(user_id: int, admin=Depends(require_admin)):
+    if admin["provider"] != "admin":
+        raise HTTPException(403, "최고 관리자만 다른 관리자의 권한을 해제할 수 있습니다.")
     if user_id == admin["id"]:
         raise HTTPException(400, "자기 자신의 관리자 권한은 해제할 수 없습니다.")
     database_url = os.getenv("DATABASE_URL")
     with psycopg.connect(database_url) as connection:
+        target = connection.execute(
+            "SELECT provider FROM public.users WHERE id=%s LIMIT 1", (user_id,)
+        ).fetchone()
+        if target and target[0] == "admin":
+            raise HTTPException(400, "최고 관리자 계정은 해제할 수 없습니다.")
         deleted = connection.execute("DELETE FROM public.admin_users WHERE user_id=%s", (user_id,)).rowcount
         connection.commit()
     if not deleted:

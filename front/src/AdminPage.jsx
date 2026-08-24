@@ -17,6 +17,15 @@ function readSessionCache(key, fallback) {
   }
 }
 
+function formatCurrentDate() {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
+}
+
 const navItems = [
   ["overview", "▦", "개요"],
   ["feedback", "↗", "피드백"],
@@ -171,7 +180,7 @@ function AdminPage() {
         </header>
 
         <div className="admin-main">
-          <div className="admin-heading-row"><div><p className="eyebrow">2026년 8월 21일 목요일</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]} <span>✦</span></h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
+          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]} <span>✦</span></h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
 
           {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
 
@@ -305,6 +314,7 @@ function LoopWorkspace({ setActiveNav }) {
 
 function MembersWorkspace() {
   const [members, setMembers] = useState([]);
+  const [canRevoke, setCanRevoke] = useState(false);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("success");
@@ -329,6 +339,7 @@ function MembersWorkspace() {
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
       setMembers(payload.users || []);
+      setCanRevoke(payload.can_revoke === true);
     } catch (error) {
       setMessageType("error");
       setMessage(error.name === "AbortError" ? "관리자 목록 조회 시간이 초과되었습니다." : "관리자 목록을 불러오지 못했습니다.");
@@ -356,12 +367,13 @@ function MembersWorkspace() {
     }
   };
   const removeMember = async (id) => {
+    if (!canRevoke) return;
     const response = await request(`${ADMIN_API}/admin/users/${id}`, { method: "DELETE" });
     setMessageType(response.ok ? "success" : "error");
     setMessage(response.ok ? "관리자 권한을 해제했습니다." : "관리자 권한 해제에 실패했습니다.");
     if (response.ok) loadMembers();
   };
-  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)}>해제</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)} disabled={!canRevoke || member.provider === "admin"} title={member.provider === "admin" ? "최고 관리자 계정은 해제할 수 없습니다." : !canRevoke ? "최고 관리자만 해제할 수 있습니다." : "관리자 권한 해제"}>{member.provider === "admin" ? "최고 관리자" : "해제"}</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
 }
 
 function LoopCard({ tracks, setActiveNav }) {
