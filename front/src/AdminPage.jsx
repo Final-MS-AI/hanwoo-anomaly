@@ -223,12 +223,18 @@ function OverviewContent({ tracks, filteredFeedback, filter, setFilter, setActiv
     </div>
     {selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}
     <ActivityPanel notifications={notifications} />
+    <MobileAdminFooter />
   </>;
 }
 
 function FeedbackWorkspace({ filteredFeedback, filter, setFilter, reviewItem, onBound, trackLoading, trackError }) {
   const [selectedSegment, setSelectedSegment] = useState(null);
-  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {filteredFeedback.filter((item) => item.status === "검토 대기").length}건</span></div>{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={filteredFeedback.length} />{trackLoading && filteredFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : filteredFeedback.length === 0 ? <div className="empty-state">선택한 조건에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{filteredFeedback.map((item) => <FeedbackRow key={item.id} item={item} onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /></>;
+  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {filteredFeedback.filter((item) => item.status === "검토 대기").length}건</span></div>{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={filteredFeedback.length} />{trackLoading && filteredFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : filteredFeedback.length === 0 ? <div className="empty-state">선택한 조건에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{filteredFeedback.map((item) => <FeedbackRow key={item.id} item={item} onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /><MobileAdminFooter /></>;
+}
+
+function MobileAdminFooter() {
+  const navigate = useNavigate();
+  return <section className="mobile-admin-footer"><div className="mobile-system-status"><span /><div><strong>시스템 정상</strong><small>모든 서비스가 정상 작동 중입니다</small></div></div><button type="button" onClick={() => navigate("/dashboard")}>← 앱으로 돌아가기</button></section>;
 }
 
 function TrackDetailPanel({ segmentId, onClose, onChanged }) {
