@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import "./AbnormalCattleDashboard.css";
 import DashboardAlertFeedback from "./DashboardAlertFeedback";
+import BarnOperationsReport from "./BarnOperationsReport";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -50,6 +51,8 @@ function AbnormalCattleDashboard() {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [activeVideo, setActiveVideo] = useState(null);
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,8 +98,10 @@ function AbnormalCattleDashboard() {
             earTagNumber: item.ear_tag_number,
             detectedAt: item.detected_at,
             anomalyEventId: item.anomaly_event_id,
+            trackId: item.track_id,
             imageUrl: item.image_url ?? item.imageUrl,
             videoUrl: item.video_url ?? item.videoUrl,
+            durationSeconds: item.duration_seconds ?? item.durationSeconds,
           })),
         );
 
@@ -148,11 +153,16 @@ function AbnormalCattleDashboard() {
           <p>행동 변화가 감지된 개체를 확인합니다.</p>
           {loadError && <p role="alert">{loadError}</p>}
         </div>
-        <span className="dashboard-update-time">
-          {isLoading
-            ? "데이터 불러오는 중"
-            : `최종 갱신 ${formatUpdatedAt(updatedAt)}`}
-        </span>
+        <div className="dashboard-header-actions">
+          <button className="dashboard-report-button" type="button" onClick={() => setIsReportOpen(true)}>
+            운영 보고서 만들기
+          </button>
+          <span className="dashboard-update-time">
+            {isLoading
+              ? "데이터 불러오는 중"
+              : `최종 갱신 ${formatUpdatedAt(updatedAt)}`}
+          </span>
+        </div>
       </div>
 
       <div className="dashboard-summary-grid">
@@ -235,19 +245,33 @@ function AbnormalCattleDashboard() {
                   <span className={`cattle-status-dot ${cattle.status}`} />
                   <strong>{cattle.cattleId}</strong>
                 </div>
-                <span className="cattle-behavior">{cattle.behavior}</span>
+                <span className="cattle-behavior">
+                  {cattle.behavior}
+                  {Number(cattle.durationSeconds) > 0 && (
+                    <small> · {Math.round(Number(cattle.durationSeconds))}초 연속</small>
+                  )}
+                </span>
                 <time>{cattle.lastDetectedAt}</time>
                 {(cattle.imageUrl || cattle.videoUrl) && (
                   <div className="dashboard-event-media">
                     {cattle.imageUrl && (
                       <a href={cattle.imageUrl} target="_blank" rel="noreferrer">
-                        대표 이미지
+                        {cattle.cattleId} 대표 이미지
                       </a>
                     )}
                     {cattle.videoUrl && (
-                      <a href={cattle.videoUrl} target="_blank" rel="noreferrer">
-                        감지 영상
-                      </a>
+                      <button
+                        className="dashboard-media-button"
+                        type="button"
+                        onClick={() =>
+                          setActiveVideo({
+                            url: cattle.videoUrl,
+                            label: `${cattle.cattleId} 감지 영상`,
+                          })
+                        }
+                      >
+                        감지 영상 보기
+                      </button>
                     )}
                   </div>
                 )}
@@ -284,6 +308,36 @@ function AbnormalCattleDashboard() {
           </div>
         </aside>
       </div>
+      {activeVideo && (
+        <div
+          className="dashboard-video-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeVideo.label}
+          onClick={() => setActiveVideo(null)}
+        >
+          <div
+            className="dashboard-video-modal-card"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div>
+              <strong>{activeVideo.label}</strong>
+              <button type="button" onClick={() => setActiveVideo(null)}>
+                닫기
+              </button>
+            </div>
+            <video src={activeVideo.url} controls autoPlay playsInline>
+              이 브라우저에서는 영상을 재생할 수 없습니다.
+            </video>
+          </div>
+        </div>
+      )}
+      <BarnOperationsReport
+        open={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        cattle={abnormalCattle}
+        updatedAt={updatedAt}
+      />
     </section>
   );
 }
