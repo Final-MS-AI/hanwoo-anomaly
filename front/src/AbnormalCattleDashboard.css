@@ -670,13 +670,13 @@
 
   .operations-report-header,
   .report-overview,
-  .report-section,
   .report-history-detail > div,
   .report-cattle-item {
     break-inside: avoid;
     page-break-inside: avoid;
   }
 
+  .report-section-heading { break-after: avoid; page-break-after: avoid; }
   .operations-report-header { padding-bottom: 12px; }
   .report-section { margin-top: 16px; }
   .report-overview { margin: 14px 0; }
