@@ -1,0 +1,11 @@
+[Unit]
+Description=Send COWOW weekly barn operations email every Monday 09:00 KST
+
+[Timer]
+# VM time is UTC, so 00:00 UTC is 09:00 Korea Standard Time.
+OnCalendar=Mon *-*-* 00:00:00 UTC
+Persistent=true
+Unit=cowow-weekly-report.service
+
+[Install]
+WantedBy=timers.target
