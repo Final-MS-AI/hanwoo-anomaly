@@ -20,6 +20,12 @@ hanwoo.koreacentral.cloudapp.azure.com {
 		reverse_proxy 127.0.0.1:8000
 	}
 
+	# Vite가 생성한 JavaScript·CSS는 SPA fallback 없이 원본 정적 파일로 제공한다.
+	handle /assets/* {
+		root * /var/www/hanwoo
+		file_server
+	}
+
 	handle /inference/* {
 		reverse_proxy 127.0.0.1:8000
 	}

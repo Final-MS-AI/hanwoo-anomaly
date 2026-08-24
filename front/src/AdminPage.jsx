@@ -6,6 +6,8 @@ const MUZZLE_API = "https://hanwoo.koreacentral.cloudapp.azure.com/muzzle";
 const ADMIN_API = "https://hanwoo.koreacentral.cloudapp.azure.com";
 const TRACK_CACHE_KEY = "cowow-admin-tracks";
 const NOTIFICATION_CACHE_KEY = "cowow-admin-notifications";
+const MEMBER_CACHE_KEY = "cowow-admin-members";
+const BINDING_CACHE_KEY = "cowow-admin-recent-bindings";
 const trackDetailCache = new Map();
 
 function readSessionCache(key, fallback) {
@@ -17,15 +19,26 @@ function readSessionCache(key, fallback) {
   }
 }
 
+function formatCurrentDate() {
+  return new Intl.DateTimeFormat("ko-KR", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    weekday: "long",
+  }).format(new Date());
+}
+
 const navItems = [
   ["overview", "▦", "개요"],
   ["feedback", "↗", "피드백"],
   ["loop", "⟳", "학습 루프"],
   ["members", "♙", "사용자 관리"],
+  ["help", "?", "도움말"],
 ];
 
 function trackToFeedback(track) {
   const bound = Boolean(track.national_id);
+  const reviewStatus = track.review_status === "held" ? "보류됨" : track.review_status === "approved" ? "승인됨" : bound ? "승인됨" : "검토 대기";
   return {
     id: `SEG-${track.segment_id}`,
     segmentId: track.segment_id,
@@ -34,8 +47,8 @@ function trackToFeedback(track) {
     detail: bound ? `한우 ${track.national_id}에 과거 관측 ${track.frame_count ?? 0}건 소급 적용` : `카메라 ${track.camera_id} · 추적 ID ${track.track_id} · 비문 확인 필요`,
     user: track.camera_id ? `카메라 ${track.camera_id}` : "muzzle API",
     time: track.started_at ? new Date(track.started_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "시간 정보 없음",
-    status: bound ? "승인됨" : "검토 대기",
-    tone: bound ? "green" : "blue",
+    status: reviewStatus,
+    tone: reviewStatus === "승인됨" ? "green" : reviewStatus === "보류됨" ? "orange" : "blue",
     nationalId: track.national_id,
     frameCount: track.frame_count ?? 0,
     similarity: track.similarity,
@@ -50,6 +63,7 @@ function AdminPage() {
   const [trackLoading, setTrackLoading] = useState(() => readSessionCache(TRACK_CACHE_KEY, []).length === 0);
   const [trackError, setTrackError] = useState("");
   const [permission, setPermission] = useState("checking");
+  const [currentAdmin, setCurrentAdmin] = useState(null);
   const [notice, setNotice] = useState("");
   const cachedNotifications = readSessionCache(NOTIFICATION_CACHE_KEY, { notifications: [], unreadCount: 0 });
   const [notifications, setNotifications] = useState(cachedNotifications.notifications || []);
@@ -87,7 +101,11 @@ function AdminPage() {
 
   useEffect(() => {
     fetch(`${ADMIN_API}/admin/me`, { credentials: "include" })
-      .then((response) => setPermission(response.ok ? "granted" : "denied"))
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (response.ok) setCurrentAdmin(payload.admin || null);
+        setPermission(response.ok ? "granted" : "denied");
+      })
       .catch(() => setPermission("denied"));
   }, []);
 
@@ -110,9 +128,19 @@ function AdminPage() {
     setUnreadCount(0);
   };
 
-  const reviewItem = (id, status) => {
-    setFeedback((items) => items.map((item) => item.id === id ? { ...item, status } : item));
-    setNotice(status === "승인됨" ? "피드백을 승인했습니다. 다음 학습 루프에 반영됩니다." : "피드백을 보류했습니다.");
+  const reviewItem = async (id, status) => {
+    const item = feedback.find((entry) => entry.id === id);
+    if (!item?.segmentId) return;
+    const reviewStatus = status === "승인됨" ? "approved" : "held";
+    try {
+      const response = await fetch(`${MUZZLE_API}/tracks/${item.segmentId}/review?status=${reviewStatus}`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setFeedback((items) => items.map((entry) => entry.id === id ? { ...entry, status } : entry));
+      window.sessionStorage.setItem(TRACK_CACHE_KEY, JSON.stringify(feedback.map((entry) => entry.id === id ? { ...entry, status } : entry)));
+      setNotice(status === "승인됨" ? "피드백을 승인했습니다." : "피드백을 보류했습니다.");
+    } catch (error) {
+      setNotice(`피드백 상태 저장에 실패했습니다: ${error.message}`);
+    }
   };
 
   const loadNotifications = async () => {
@@ -147,7 +175,7 @@ function AdminPage() {
       <aside className="admin-sidebar">
         <button className="admin-brand" type="button" onClick={() => navigate("/dashboard")}>
           <span className="admin-brand-mark"><img src="/cowow-bull.png" alt="COWOW 소 캐릭터" /></span>
-          <span className="admin-brand-wordmark"><img src="/cowow-logo.png" alt="COWOW" /><small>관리자</small></span>
+          <span className="admin-brand-wordmark"><img src="/cowow-logo.png" alt="COWOW" /><small>개발자</small></span>
         </button>
         <div className="admin-workspace"><span className="workspace-dot" /> 한우 · 메인 워크스페이스 <span>⌄</span></div>
         <p className="admin-nav-label">관리 메뉴</p>
@@ -160,25 +188,26 @@ function AdminPage() {
         </nav>
         <div className="admin-sidebar-bottom">
           <div className="system-status"><span /><div><strong>시스템 정상</strong><small>모든 서비스가 정상 작동 중입니다</small></div></div>
-          <button type="button" className="back-to-app" onClick={() => navigate("/dashboard")}>← 앱으로 돌아가기</button>
+          <button type="button" className="back-to-app" onClick={() => navigate("/dashboard")}>← 웹으로 돌아가기</button>
         </div>
       </aside>
 
       <section className="admin-content">
         <header className="admin-topbar">
           <div className="admin-breadcrumb"><span>워크스페이스</span><i>/</i><strong>{navItems.find(([key]) => key === activeNav)?.[2]}</strong></div>
-          <div className="admin-top-actions"><span className="live-pill"><span /> 운영 중</span><div className="notification-anchor"><button className="icon-button" type="button" aria-label="알림" aria-expanded={isNotificationOpen} onClick={() => { setIsNotificationOpen((open) => !open); if (!isNotificationOpen) loadNotifications(); }}>♧{unreadCount > 0 && <em>{unreadCount > 99 ? "99+" : unreadCount}</em>}</button>{isNotificationOpen && <NotificationPanel notifications={notifications} onRead={markNotificationRead} onReadAll={markAllNotificationsRead} />}</div><div className="admin-avatar">SY</div><strong>관리자</strong></div>
+          <div className="admin-top-actions"><span className={`live-pill ${trackError ? "offline" : ""}`}><span /> {trackLoading ? "API 확인 중" : trackError ? "API 오류" : "API 정상"}</span><div className="notification-anchor"><button className="icon-button" type="button" aria-label="알림" aria-expanded={isNotificationOpen} onClick={() => { setIsNotificationOpen((open) => !open); if (!isNotificationOpen) loadNotifications(); }}>♧{unreadCount > 0 && <em>{unreadCount > 99 ? "99+" : unreadCount}</em>}</button>{isNotificationOpen && <NotificationPanel notifications={notifications} onRead={markNotificationRead} onReadAll={markAllNotificationsRead} />}</div><div className="admin-avatar">{(currentAdmin?.name || currentAdmin?.email || "개발자").slice(0, 2).toUpperCase()}</div><strong>{currentAdmin?.name || currentAdmin?.email || "개발자"}</strong></div>
         </header>
 
         <div className="admin-main">
-          <div className="admin-heading-row"><div><p className="eyebrow">2026년 8월 21일 목요일</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]} <span>✦</span></h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
+          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]}</h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
 
           {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
 
           {activeNav === "overview" && <OverviewContent tracks={feedback} filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} setActiveNav={setActiveNav} reviewItem={reviewItem} trackLoading={trackLoading} onBound={refreshAdminData} notifications={notifications} />}
           {activeNav === "feedback" && <FeedbackWorkspace filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
-          {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} />}
+          {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} tracks={feedback} />}
           {activeNav === "members" && <MembersWorkspace />}
+          {activeNav === "help" && <HelpWorkspace />}
         </div>
       </section>
     </main>
@@ -217,7 +246,7 @@ function OverviewContent({ tracks, filteredFeedback, filter, setFilter, setActiv
 
 function FeedbackWorkspace({ filteredFeedback, filter, setFilter, reviewItem, onBound, trackLoading, trackError }) {
   const [selectedSegment, setSelectedSegment] = useState(null);
-  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {filteredFeedback.filter((item) => item.status === "검토 대기").length}건</span></div>{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={filteredFeedback.length} />{trackLoading && filteredFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : filteredFeedback.length === 0 ? <div className="empty-state">선택한 조건에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{filteredFeedback.map((item) => <FeedbackRow key={item.id} item={item} onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /></>;
+  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {filteredFeedback.filter((item) => item.status === "검토 대기").length}건</span></div>{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={filteredFeedback.length} />{trackLoading && filteredFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : filteredFeedback.length === 0 ? <div className="empty-state">선택한 조건에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{filteredFeedback.map((item) => <FeedbackRow key={item.id} item={item} onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /> </>;
 }
 
 function TrackDetailPanel({ segmentId, onClose, onChanged }) {
@@ -299,39 +328,145 @@ function FeedbackFilters({ filter, setFilter, count }) {
   return <div className="filter-row"><div className="filter-tabs">{["전체", "ID 역전파", "바인딩 충돌", "미확정 트랙"].map((item) => <button type="button" key={item} className={filter === item ? "selected" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span className="muted-count">{count}건</span></div>;
 }
 
-function LoopWorkspace({ setActiveNav }) {
-  return <><section className="admin-panel full-panel loop-detail-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>한 번의 바인딩이 트랙의 과거 관측 전체에 반영되는 과정을 확인합니다.</p></div><span className="running-badge"><span /> 진행 중</span></div><div className="large-loop"><div className="large-loop-step done"><b>✓</b><strong>비문 식별</strong><small>코무늬 임베딩과 유사도 비교</small></div><div className="large-loop-step done"><b>✓</b><strong>트랙 연결</strong><small>track_segment에 개체 바인딩</small></div><div className="large-loop-step current"><b>03</b><strong>ID 역전파</strong><small>과거 track_observation에 소급</small></div><div className="large-loop-step"><b>04</b><strong>타임라인 확인</strong><small>개체별 이력으로 조회</small></div></div></section><section className="admin-panel full-panel"><div className="panel-heading"><div><h2>최근 바인딩 작업</h2><p>muzzle API에서 조회한 트랙을 피드백에서 확인하세요.</p></div><button className="secondary-button compact-button" type="button" onClick={() => setActiveNav("feedback")}>피드백에서 확인 →</button></div><div className="empty-state">피드백에서 실제 트랙을 선택하면 상세 정보와 현재 바인딩 상태를 확인할 수 있습니다.</div></section></>;
+function LoopWorkspace({ setActiveNav, tracks }) {
+  const cachedBindings = readSessionCache(BINDING_CACHE_KEY, []);
+  const [bindings, setBindings] = useState(cachedBindings);
+  const [loading, setLoading] = useState(cachedBindings.length === 0);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`${MUZZLE_API}/tracks/bindings/recent?limit=10`, { credentials: "include" })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
+        if (!cancelled) {
+          const nextBindings = payload.bindings || [];
+          setBindings(nextBindings);
+          window.sessionStorage.setItem(BINDING_CACHE_KEY, JSON.stringify(nextBindings));
+        }
+      })
+      .catch((requestError) => { if (!cancelled) setError(requestError.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+  const hasTracks = tracks.length > 0;
+  const hasBindings = bindings.length > 0 || tracks.some((item) => item.nationalId);
+  const steps = [
+    ["✓", "비문 식별", "코무늬 임베딩과 유사도 비교", hasTracks ? "done" : "pending"],
+    [hasBindings ? "✓" : "02", "트랙 연결", "track_segment에 개체 바인딩", hasBindings ? "done" : "pending"],
+    [hasBindings ? "✓" : "03", "ID 역전파", "과거 track_observation에 소급", hasBindings ? "done" : "pending"],
+    [bindings.length ? "✓" : "04", "타임라인 확인", "개체별 이력으로 조회", bindings.length ? "done" : "pending"],
+  ];
+  const loopStatus = loading ? "API 확인 중" : error ? "API 오류" : bindings.length ? "데이터 반영 중" : "대기 중";
+  return <><section className="admin-panel full-panel loop-detail-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>실제 muzzle API 데이터 기준 처리 현황입니다.</p></div><span className="running-badge"><span /> {loopStatus}</span></div><div className="large-loop">{steps.map(([icon, title, detail, status]) => <div className={`large-loop-step ${status}`} key={title}><b>{icon}</b><strong>{title}</strong><small>{detail}</small></div>)}</div></section><section className="admin-panel full-panel"><div className="panel-heading"><div><h2>최근 바인딩 작업</h2><p>muzzle API에서 조회한 실제 바인딩 기록입니다.</p></div><button className="secondary-button compact-button" type="button" onClick={() => setActiveNav("feedback")}>피드백에서 확인 →</button></div>{loading ? <div className="empty-state">최근 바인딩 작업을 불러오는 중입니다…</div> : error ? <div className="api-error">최근 바인딩 작업을 불러오지 못했습니다: {error}</div> : bindings.length === 0 ? <div className="empty-state">아직 바인딩된 작업이 없습니다.</div> : <div className="binding-table"><div className="binding-head"><span>트랙</span><span>개체 ID</span><span>반영 관측</span><span>유사도</span><span>처리 시각</span></div>{bindings.map((item) => <div key={`${item.segment_id}-${item.decided_at}`}><strong>segment #{item.segment_id}</strong><span>{item.national_id}</span><span>{item.affected_observations}건</span><span>{Number(item.similarity ?? 0).toFixed(4)}</span><span>{item.decided_at ? new Date(item.decided_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</span></div>)}</div>}</section></>;
 }
 
 function MembersWorkspace() {
-  const [members, setMembers] = useState([]);
+  const cachedMembers = readSessionCache(MEMBER_CACHE_KEY, { users: [], canRevoke: false });
+  const [members, setMembers] = useState(cachedMembers.users || []);
+  const [canRevoke, setCanRevoke] = useState(cachedMembers.canRevoke === true);
+  const [membersLoading, setMembersLoading] = useState((cachedMembers.users || []).length === 0);
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState("success");
+  const [isAdding, setIsAdding] = useState(false);
   useEffect(() => {
     if (!message) return undefined;
     const timer = window.setTimeout(() => setMessage(""), 3500);
     return () => window.clearTimeout(timer);
   }, [message]);
-  const loadMembers = () => fetch(`${ADMIN_API}/admin/users`, { credentials: "include" }).then((response) => response.json()).then((payload) => setMembers(payload.users || [])).catch(() => setMessage("관리자 목록을 불러오지 못했습니다."));
+  const request = async (url, options = {}) => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 12000);
+    try {
+      return await fetch(url, { ...options, credentials: "include", signal: controller.signal });
+    } finally {
+      window.clearTimeout(timeout);
+    }
+  };
+  const loadMembers = async () => {
+    setMembersLoading(true);
+    try {
+      const response = await request(`${ADMIN_API}/admin/users`);
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+      setMembers(payload.users || []);
+      setCanRevoke(payload.can_revoke === true);
+      window.sessionStorage.setItem(MEMBER_CACHE_KEY, JSON.stringify({ users: payload.users || [], canRevoke: payload.can_revoke === true }));
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.name === "AbortError" ? "관리자 목록 조회 시간이 초과되었습니다." : "관리자 목록을 불러오지 못했습니다.");
+    } finally {
+      setMembersLoading(false);
+    }
+  };
   useEffect(() => { loadMembers(); }, []);
   const addMember = async (event) => {
     event.preventDefault();
-    const response = await fetch(`${ADMIN_API}/admin/users/by-email?email=${encodeURIComponent(email)}`, { method: "POST", credentials: "include" });
-    const payload = await response.json().catch(() => ({}));
-    setMessage(response.ok ? "관리자를 추가했습니다." : (payload.detail || "관리자 추가에 실패했습니다."));
-    if (response.ok) { setEmail(""); loadMembers(); }
+    if (isAdding) return;
+    setIsAdding(true);
+    setMessage("");
+    try {
+      const response = await request(`${ADMIN_API}/admin/users/by-email?email=${encodeURIComponent(email.trim())}`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || "관리자 추가에 실패했습니다.");
+      setMessageType("success");
+      setMessage("관리자를 추가했습니다.");
+      setEmail("");
+      await loadMembers();
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.name === "AbortError" ? "관리자 추가 시간이 초과되었습니다. 서버 상태를 확인하세요." : error.message);
+    } finally {
+      setIsAdding(false);
+    }
   };
   const removeMember = async (id) => {
-    const response = await fetch(`${ADMIN_API}/admin/users/${id}`, { method: "DELETE", credentials: "include" });
+    if (!canRevoke) return;
+    const response = await request(`${ADMIN_API}/admin/users/${id}`, { method: "DELETE" });
+    setMessageType(response.ok ? "success" : "error");
     setMessage(response.ok ? "관리자 권한을 해제했습니다." : "관리자 권한 해제에 실패했습니다.");
     if (response.ok) loadMembers();
   };
-  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" required /><button className="primary-button" type="submit">+ 관리자 추가</button></form>{message && <p className="binding-message success" role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)}>해제</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+  return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)} disabled={!canRevoke || member.provider === "admin"} title={member.provider === "admin" ? "최고 관리자 계정은 해제할 수 없습니다." : !canRevoke ? "최고 관리자만 해제할 수 있습니다." : "관리자 권한 해제"}>{member.provider === "admin" ? "최고 관리자" : "해제"}</button></div>)}{membersLoading && members.length === 0 && <div className="empty-state">관리자 목록을 불러오는 중입니다…</div>}{!membersLoading && members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+}
+
+function HelpWorkspace() {
+  return <div className="help-workspace">
+    <section className="admin-panel full-panel help-hero">
+      <p className="eyebrow">ADMIN GUIDE</p>
+      <h2>관리자 페이지 사용 안내</h2>
+      <p>한우 영상에서 확인된 트랙과 ID 역전파 상태를 확인하고, 필요한 경우 개체 ID를 직접 연결할 수 있습니다.</p>
+    </section>
+    <div className="help-card-grid">
+      <HelpCard number="01" title="개요" tone="blue"><p>전체 트랙 수, 검토 대기 트랙, 바인딩 적용률을 한눈에 확인합니다.</p><small>카드의 수치는 muzzle API에서 최신 데이터를 받아 표시합니다.</small></HelpCard>
+      <HelpCard number="02" title="피드백" tone="orange"><p>미확정 트랙을 확인하고 상세 정보 화면으로 이동합니다.</p><small>목록의 <strong>상세</strong> 버튼을 누르면 카메라, 세션, 프레임 수를 확인할 수 있습니다.</small></HelpCard>
+      <HelpCard number="03" title="ID 바인딩" tone="green"><p>상세 화면에서 가축이력번호와 유사도를 입력해 트랙에 ID를 연결합니다.</p><small>유사도는 운영 기준 0.70 이상이어야 하며, 적용 후 과거 관측에 ID가 역전파됩니다.</small></HelpCard>
+      <HelpCard number="04" title="알림" tone="purple"><p>우측 상단 알림 버튼에서 바인딩, 해제, 권한 변경 기록을 확인합니다.</p><small>알림을 누르면 읽음 처리되고, 모두 읽음으로 전체 상태를 변경할 수 있습니다.</small></HelpCard>
+      <HelpCard number="05" title="사용자 관리" tone="slate"><p>이미 가입한 사용자의 이메일을 등록해 관리자 권한을 부여합니다.</p><small>최고 관리자 계정만 다른 관리자의 권한을 해제할 수 있습니다.</small></HelpCard>
+      <HelpCard number="06" title="새로고침과 오류" tone="red"><p>데이터 새로고침은 트랙과 알림을 다시 조회합니다.</p><small>API 오류가 계속되면 로그인 상태, 서버 상태, 네트워크 연결을 확인하세요.</small></HelpCard>
+    </div>
+    <section className="admin-panel full-panel help-steps-panel">
+      <div className="panel-heading"><div><h2>검토 대기 트랙 처리 순서</h2><p>처음 사용하는 경우 아래 순서대로 진행하세요.</p></div></div>
+      <div className="help-steps"><HelpStep number="1" title="피드백 열기" detail="왼쪽 메뉴에서 피드백을 선택합니다." /><HelpStep number="2" title="상세 확인" detail="확인할 트랙의 상세 버튼을 누릅니다." /><HelpStep number="3" title="정보 입력" detail="가축이력번호와 유사도를 입력합니다." /><HelpStep number="4" title="바인딩 적용" detail="ID 바인딩 적용을 눌러 역전파를 실행합니다." /></div>
+    </section>
+  </div>;
+}
+
+function HelpCard({ number, title, tone, children }) {
+  return <article className={`help-card ${tone}`}><span>{number}</span><h3>{title}</h3>{children}</article>;
+}
+
+function HelpStep({ number, title, detail }) {
+  return <div className="help-step"><b>{number}</b><div><strong>{title}</strong><small>{detail}</small></div></div>;
 }
 
 function LoopCard({ tracks, setActiveNav }) {
   const featuredTrack = tracks.find((item) => item.status === "승인됨") || tracks[0];
-  return <section className="admin-panel loop-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>확정된 개체 ID가 트랙의 과거 관측에 소급 적용됩니다.</p></div><span className="running-badge"><span /> 진행 중</span></div><div className="loop-visual"><div className="loop-line"><span className="loop-progress" /></div>{[["01", "비문 식별", "코무늬 유사도 판정", "done"], ["02", "트랙 연결", "개체 ID 바인딩", "done"], ["03", "ID 역전파", "과거 관측에 소급", "current"], ["04", "타임라인", "개체 이력 확인", "pending"]].map(([number, title, desc, state]) => <div className={`loop-step ${state}`} key={number}><span className="step-number">{state === "done" ? "✓" : number}</span><strong>{title}</strong><small>{desc}</small></div>)}</div><div className="loop-footer"><div><span>현재 트랙</span><strong>{featuredTrack ? `segment #${featuredTrack.segmentId}` : "데이터 없음"}</strong></div><div><span>소급 반영 관측</span><strong>{featuredTrack ? `${featuredTrack.frameCount}건` : "—"}</strong></div><div><span>운영 임계값</span><strong>유사도 0.70</strong></div></div><button className="secondary-button" type="button" onClick={() => setActiveNav("feedback")}>트랙 상세 보기 →</button></section>;
+  const hasTracks = tracks.length > 0;
+  const hasBindings = tracks.some((item) => item.nationalId);
+  const steps = [["01", "비문 식별", "코무늬 유사도 판정", hasTracks ? "done" : "pending"], ["02", "트랙 연결", "개체 ID 바인딩", hasBindings ? "done" : "pending"], ["03", "ID 역전파", "과거 관측에 소급", hasBindings ? "done" : "pending"], ["04", "타임라인", "개체 이력 확인", hasBindings ? "done" : "pending"]];
+  return <section className="admin-panel loop-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>실제 트랙과 바인딩 데이터 기준 처리 현황입니다.</p></div><span className="running-badge"><span /> {hasBindings ? "데이터 반영 완료" : hasTracks ? "바인딩 대기" : "데이터 없음"}</span></div><div className="loop-visual"><div className="loop-line"><span className="loop-progress" style={{ width: hasBindings ? "100%" : hasTracks ? "25%" : "0%" }} /></div>{steps.map(([number, title, desc, state]) => <div className={`loop-step ${state}`} key={number}><span className="step-number">{state === "done" ? "✓" : number}</span><strong>{title}</strong><small>{desc}</small></div>)}</div><div className="loop-footer"><div><span>현재 트랙</span><strong>{featuredTrack ? `segment #${featuredTrack.segmentId}` : "데이터 없음"}</strong></div><div><span>소급 반영 관측</span><strong>{featuredTrack ? `${featuredTrack.frameCount}건` : "—"}</strong></div><div><span>운영 임계값</span><strong>유사도 0.70</strong></div></div><button className="secondary-button" type="button" onClick={() => setActiveNav("feedback")}>트랙 상세 보기 →</button></section>;
 }
 
 function ActivityPanel({ notifications = [] }) {
