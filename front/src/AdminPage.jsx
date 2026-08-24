@@ -20,6 +20,7 @@ function readSessionCache(key, fallback) {
 const navItems = [
   ["overview", "▦", "개요"],
   ["feedback", "↗", "피드백"],
+  ["ai-feedback", "✓", "AI 피드백 검토"],
   ["loop", "⟳", "학습 루프"],
   ["members", "♙", "사용자 관리"],
 ];
@@ -177,6 +178,7 @@ function AdminPage() {
 
           {activeNav === "overview" && <OverviewContent tracks={feedback} filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} setActiveNav={setActiveNav} reviewItem={reviewItem} trackLoading={trackLoading} onBound={refreshAdminData} notifications={notifications} />}
           {activeNav === "feedback" && <FeedbackWorkspace filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
+          {activeNav === "ai-feedback" && <AiFeedbackWorkspace />}
           {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} />}
           {activeNav === "members" && <MembersWorkspace />}
         </div>
@@ -301,6 +303,195 @@ function FeedbackFilters({ filter, setFilter, count }) {
 
 function LoopWorkspace({ setActiveNav }) {
   return <><section className="admin-panel full-panel loop-detail-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>한 번의 바인딩이 트랙의 과거 관측 전체에 반영되는 과정을 확인합니다.</p></div><span className="running-badge"><span /> 진행 중</span></div><div className="large-loop"><div className="large-loop-step done"><b>✓</b><strong>비문 식별</strong><small>코무늬 임베딩과 유사도 비교</small></div><div className="large-loop-step done"><b>✓</b><strong>트랙 연결</strong><small>track_segment에 개체 바인딩</small></div><div className="large-loop-step current"><b>03</b><strong>ID 역전파</strong><small>과거 track_observation에 소급</small></div><div className="large-loop-step"><b>04</b><strong>타임라인 확인</strong><small>개체별 이력으로 조회</small></div></div></section><section className="admin-panel full-panel"><div className="panel-heading"><div><h2>최근 바인딩 작업</h2><p>muzzle API에서 조회한 트랙을 피드백에서 확인하세요.</p></div><button className="secondary-button compact-button" type="button" onClick={() => setActiveNav("feedback")}>피드백에서 확인 →</button></div><div className="empty-state">피드백에서 실제 트랙을 선택하면 상세 정보와 현재 바인딩 상태를 확인할 수 있습니다.</div></section></>;
+}
+
+
+function AiFeedbackWorkspace() {
+  const [status, setStatus] = useState("pending");
+  const [items, setItems] = useState([]);
+  const [notes, setNotes] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const loadFeedback = async (nextStatus = status) => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(
+        `${ADMIN_API}/admin/feedback?status=${encodeURIComponent(nextStatus)}&limit=100`,
+        { credentials: "include" },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
+      setItems(payload.feedback || []);
+    } catch (err) {
+      setItems([]);
+      setError(`AI 피드백을 불러오지 못했습니다: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFeedback(status);
+  }, [status]);
+
+  const review = async (item, nextStatus) => {
+    setMessage("");
+    setError("");
+    try {
+      const response = await fetch(
+        `${ADMIN_API}/admin/feedback/${item.id}/review`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            status: nextStatus,
+            note: notes[item.id]?.trim() || null,
+          }),
+        },
+      );
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
+
+      setMessage(
+        nextStatus === "approved"
+          ? "AI 피드백을 승인했습니다."
+          : "AI 피드백을 반려했습니다.",
+      );
+
+      await loadFeedback(status);
+    } catch (err) {
+      setError(`검토 처리에 실패했습니다: ${err.message}`);
+    }
+  };
+
+  const typeLabel = (value) => ({
+    false_anomaly: "이상 오탐",
+    wrong_behavior: "행동 분류 오류",
+    wrong_tracking: "개체 연결 오류",
+    false_detection: "객체 오탐",
+  }[value] || value || "-");
+
+  const statusLabel = (value) => ({
+    pending: "검토 대기",
+    approved: "승인됨",
+    rejected: "반려됨",
+    exported: "학습 전달됨",
+  }[value] || value);
+
+  return (
+    <section className="admin-panel full-panel ai-feedback-workspace">
+      <div className="panel-heading">
+        <div>
+          <h2>AI 피드백 검토</h2>
+          <p>사용자가 이상 탐지 화면에서 제출한 AI 오류 신고를 검토합니다.</p>
+        </div>
+        <span className="api-connected-badge">model_feedback DB</span>
+      </div>
+
+      <div className="ai-feedback-toolbar">
+        <div className="filter-tabs">
+          {[
+            ["pending", "검토 대기"],
+            ["approved", "승인"],
+            ["rejected", "반려"],
+            ["exported", "학습 전달"],
+          ].map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              className={status === value ? "selected" : ""}
+              onClick={() => setStatus(value)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="muted-count">{items.length}건</span>
+      </div>
+
+      {message && <p className="binding-message success">{message}</p>}
+      {error && <div className="api-error" role="alert">{error}</div>}
+
+      {loading ? (
+        <div className="empty-state">AI 피드백을 불러오는 중입니다…</div>
+      ) : items.length === 0 ? (
+        <div className="empty-state">해당 상태의 AI 피드백이 없습니다.</div>
+      ) : (
+        <div className="ai-feedback-list">
+          {items.map((item) => (
+            <article className="ai-feedback-card" key={item.id}>
+              <div className="ai-feedback-card-head">
+                <div>
+                  <span className="feedback-type blue">
+                    {typeLabel(item.feedback_type)}
+                  </span>
+                  <strong>{item.device_id || "장비 정보 없음"}</strong>
+                </div>
+                <span className={`review-status ${item.review_status === "approved" ? "approved" : item.review_status === "rejected" ? "held" : "pending"}`}>
+                  {statusLabel(item.review_status)}
+                </span>
+              </div>
+
+              <div className="ai-feedback-values">
+                <div><span>AI 판단</span><strong>{item.predicted_label || "-"}</strong></div>
+                <div><span>사용자 수정</span><strong>{item.corrected_label || "-"}</strong></div>
+                <div><span>처리 단계</span><strong>{item.triage_stage || "-"}</strong></div>
+                <div>
+                  <span>발생 시각</span>
+                  <strong>
+                    {item.created_at
+                      ? new Date(item.created_at).toLocaleString("ko-KR")
+                      : "-"}
+                  </strong>
+                </div>
+              </div>
+
+              {item.comment && <p className="ai-feedback-comment">{item.comment}</p>}
+
+              <div className="ai-feedback-meta">
+                <span>event: {item.anomaly_event_id || "-"}</span>
+                <span>image: {item.evidence_blob_name || "-"}</span>
+                <span>video: {item.video_blob_name || "-"}</span>
+              </div>
+
+              {item.review_status === "pending" && (
+                <div className="ai-feedback-review">
+                  <input
+                    type="text"
+                    value={notes[item.id] || ""}
+                    onChange={(event) =>
+                      setNotes((current) => ({
+                        ...current,
+                        [item.id]: event.target.value,
+                      }))
+                    }
+                    placeholder="관리자 검토 메모(선택)"
+                    maxLength={1000}
+                  />
+                  <button className="approve-action" type="button" onClick={() => review(item, "approved")}>
+                    ✓ 승인
+                  </button>
+                  <button className="hold-action" type="button" onClick={() => review(item, "rejected")}>
+                    × 반려
+                  </button>
+                </div>
+              )}
+
+              {item.reviewer_note && (
+                <p className="ai-feedback-review-note">
+                  검토 메모: {item.reviewer_note}
+                </p>
+              )}
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
 }
 
 function MembersWorkspace() {
