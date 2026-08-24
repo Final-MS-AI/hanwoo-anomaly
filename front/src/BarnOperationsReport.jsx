@@ -49,6 +49,14 @@ function recommendationFor(sensors, cattle) {
   return items;
 }
 
+function sensorStatus(value, warning, danger) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return { label: "수집 대기", level: "pending" };
+  if (numeric >= danger) return { label: "위험", level: "danger" };
+  if (numeric >= warning) return { label: "주의", level: "warning" };
+  return { label: "정상", level: "normal" };
+}
+
 function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const [deviceState, setDeviceState] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -104,6 +112,11 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   if (!open) return null;
   const recommendations = recommendationFor(sensors, groupedCattle);
   const titleDate = new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date());
+  const temperatureStatus = sensorStatus(sensors.temperature, 28, 32);
+  const humidityStatus = sensorStatus(sensors.humidity, 75, 85);
+  const airStatus = sensorStatus(sensors.airQuality, 55, 75);
+  const priorityCattle = groupedCattle.filter((item) => item.status === "danger" || item.status === "warning");
+  const hasEnvironmentalRisk = [temperatureStatus, humidityStatus, airStatus].some((item) => item.level === "danger" || item.level === "warning");
 
   return (
     <div className="operations-report-backdrop" role="dialog" aria-modal="true" aria-label="축사 운영 보고서" onClick={onClose}>
@@ -127,20 +140,45 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
           <div><span>기준 시각</span><strong>{formatDate(updatedAt)}</strong></div>
         </section>
 
-        <section className="report-section">
-          <h3>환경 센서 현황</h3>
-          {loadError ? <p className="report-note">{loadError}</p> : (
-            <div className="report-sensor-grid">
-              <div><span>온도</span><strong>{valueOrDash(sensors.temperature, "°C")}</strong><small>주의 28°C · 위험 32°C</small></div>
-              <div><span>습도</span><strong>{valueOrDash(sensors.humidity, "%")}</strong><small>주의 75% · 위험 85%</small></div>
-              <div><span>공기질</span><strong>{valueOrDash(sensors.airQuality, "%")}</strong><small>주의 55% · 위험 75%</small></div>
-            </div>
-          )}
-          <p className="report-note">센서별 최고·최저 시각, 팬·살수 가동 시간과 환경 개선 효과는 이력 수집이 시작되는 시점부터 기간 보고서에 자동 누적됩니다.</p>
+        <section className="report-section report-executive-summary">
+          <div className="report-section-heading">
+            <div><span>01 · 종합 판단</span><h3>오늘의 축사 운영 요약</h3></div>
+            <b className={priorityCattle.length || hasEnvironmentalRisk ? "report-risk-chip" : "report-safe-chip"}>
+              {priorityCattle.length || hasEnvironmentalRisk ? "확인·조치 필요" : "현재 안정"}
+            </b>
+          </div>
+          <p>
+            {priorityCattle.length
+              ? `현재 ${priorityCattle.length}마리에서 확인이 필요한 이상행동이 감지되었습니다. 가장 최근 알림과 대표 이미지·감지 영상을 우선 확인하세요. `
+              : "현재 활성 이상행동 경보는 없습니다. "}
+            {hasEnvironmentalRisk
+              ? "환경 수치 중 주의 이상 항목이 있어 환기·냉각 운전 상태를 함께 확인해야 합니다."
+              : "현재 수집된 환경 센서값은 설정한 주의 기준 이내입니다."}
+          </p>
+          <div className="report-decision-grid">
+            <div><span>개체 관찰</span><strong>{priorityCattle.length ? "우선 점검" : "정상 관찰"}</strong><small>{priorityCattle.length ? "이상행동 영상·현장 상태 대조" : "다음 분석 결과까지 모니터링"}</small></div>
+            <div><span>환기·냉각</span><strong>{hasEnvironmentalRisk ? "운전 점검" : "현재 유지"}</strong><small>{hasEnvironmentalRisk ? "센서 추세와 팬 반응 확인" : "정상 범위 유지"}</small></div>
+            <div><span>추가 설비 판단</span><strong>이력 수집 후</strong><small>지속시간·조치 효과를 기준으로 판단</small></div>
+          </div>
         </section>
 
         <section className="report-section">
-          <h3>문제 개체 및 반복 관찰</h3>
+          <div className="report-section-heading"><div><span>02 · 환경 상태</span><h3>환경 센서 현황과 설비 판단</h3></div><small>장비 {deviceState?.publicDeviceNumber || "미연결"}</small></div>
+          {loadError ? <p className="report-note">{loadError}</p> : (
+            <div className="report-sensor-grid">
+              <div><span>온도 <b className={`sensor-status ${temperatureStatus.level}`}>{temperatureStatus.label}</b></span><strong>{valueOrDash(sensors.temperature, "°C")}</strong><small>주의 28°C · 위험 32°C</small></div>
+              <div><span>습도 <b className={`sensor-status ${humidityStatus.level}`}>{humidityStatus.label}</b></span><strong>{valueOrDash(sensors.humidity, "%")}</strong><small>주의 75% · 위험 85%</small></div>
+              <div><span>공기질 <b className={`sensor-status ${airStatus.level}`}>{airStatus.label}</b></span><strong>{valueOrDash(sensors.airQuality, "%")}</strong><small>주의 55% · 위험 75%</small></div>
+            </div>
+          )}
+          <div className="report-history-notice">
+            <strong>기간 분석 데이터 수집 상태</strong>
+            <p>현재는 최신 센서 상태를 표시합니다. 다음 수집 주기부터 최고·최저 시각, 고온·고습 지속시간, 팬·살수 가동시간, 조치 전후 온도 변화가 기간 보고서에 누적됩니다.</p>
+          </div>
+        </section>
+
+        <section className="report-section">
+          <div className="report-section-heading"><div><span>03 · 개체 이상행동</span><h3>문제 개체 및 반복 관찰</h3></div><small>활성 알림 기준</small></div>
           {groupedCattle.length ? (
             <div className="report-cattle-list">
               {groupedCattle.map((item) => (
@@ -148,7 +186,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
                   <strong>{item.cattleId}</strong>
                   <span>{item.behavior}</span>
                   <span>최근 감지 {item.lastDetectedAt || "-"}</span>
-                  <span>현재 목록 내 {item.count}건</span>
+                  <span>{item.durationSeconds ? `${Math.round(item.durationSeconds)}초 연속` : `현재 목록 내 ${item.count}건`}</span>
                 </div>
               ))}
             </div>
@@ -156,8 +194,12 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
         </section>
 
         <section className="report-section report-recommendations">
-          <h3>운영 판단 및 권고</h3>
+          <div className="report-section-heading"><div><span>04 · 권고 조치</span><h3>운영 판단 및 다음 확인 항목</h3></div></div>
           <ul>{recommendations.map((item) => <li key={item}>{item}</li>)}</ul>
+          <div className="report-follow-up">
+            <strong>다음 보고서에서 자동 검토할 항목</strong>
+            <span>① 고온 발생 시각과 지속시간 ② 팬·살수 명령 및 실제 운전 시간 ③ 제어 후 온도·습도 변화 ④ 동일 개체·증상의 반복 횟수</span>
+          </div>
         </section>
       </article>
     </div>
