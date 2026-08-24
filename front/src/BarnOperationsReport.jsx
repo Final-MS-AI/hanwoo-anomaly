@@ -110,6 +110,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const [deviceState, setDeviceState] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [loadError, setLoadError] = useState("");
+  const [reportLoadError, setReportLoadError] = useState("");
 
   useEffect(() => {
     if (!open) return undefined;
@@ -121,15 +122,27 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
         const reportResponse = await fetch(`${API_BASE_URL}/api/reports/barn?days=7`, {
           credentials: "include",
           signal: controller.signal,
+          cache: "no-store",
         });
         const report = await reportResponse.json().catch(() => ({}));
-        if (reportResponse.ok) setReportData(report);
+        if (reportResponse.ok) {
+          setReportData(report);
+          setReportLoadError("");
+        } else {
+          setReportLoadError(report.detail || "기간 센서 이력을 불러오지 못했습니다.");
+        }
         const devicesResponse = await fetch(`${API_BASE_URL}/devices/mine`, {
           credentials: "include",
           signal: controller.signal,
         });
         const devices = await devicesResponse.json();
-        const device = devices?.devices?.[0];
+        let savedDevice = null;
+        try {
+          savedDevice = JSON.parse(localStorage.getItem("cowowRegisteredDevice"));
+        } catch {
+          savedDevice = null;
+        }
+        const device = devices?.devices?.[0] ?? savedDevice;
         if (!devicesResponse.ok || !device?.deviceId) {
           throw new Error("연결된 환경 장비 정보가 없습니다.");
         }
@@ -146,8 +159,20 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
     }
 
     loadDeviceState();
-    return () => controller.abort();
+    const refreshTimer = window.setInterval(loadDeviceState, 15000);
+    return () => {
+      window.clearInterval(refreshTimer);
+      controller.abort();
+    };
   }, [open]);
+
+  const closeReport = (event) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+    setReportData(null);
+    setReportLoadError("");
+    onClose();
+  };
 
   const sensors = deviceState?.sensors || {};
   const telemetry = reportData?.telemetry;
@@ -199,7 +224,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
           </div>
           <div className="operations-report-actions">
             <button type="button" onClick={printReport}>인쇄 / PDF 저장</button>
-            <button type="button" className="report-close" onClick={onClose}>닫기</button>
+            <button type="button" className="report-close" onClick={closeReport}>닫기</button>
           </div>
         </header>
 
@@ -245,6 +270,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
             <strong>{hasHistory ? `기간 분석 완료 · ${telemetry.sampleCount}건 수집` : "기간 분석 데이터 수집 중"}</strong>
             <p>{hasHistory ? "표시값은 실시간 한 건이 아니라 저장된 센서 이력의 평균·최저·최고값입니다. 제어 가동시간은 완료된 ON/OFF 명령을 기준으로 계산합니다." : "이력 저장을 시작했습니다. ESP32가 다음 텔레메트리를 보내면 평균·최저·최고 및 지속시간이 보고서에 표시됩니다."}</p>
           </div>
+          {reportLoadError && <p className="report-note">{reportLoadError}</p>}
           {hasHistory && (
             <div className="report-history-detail">
               <div><strong>고온 구간</strong>{periodSensors.temperature?.highWindows?.length ? periodSensors.temperature.highWindows.map((item) => <span key={item.startedAt}>{formatDate(item.startedAt)} · 최고 {formatMetric(item.maxValue, "°C")} · {formatDuration(item.durationSeconds)}</span>) : <span>28°C 이상 구간 없음</span>}</div>
