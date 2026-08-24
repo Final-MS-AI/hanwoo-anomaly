@@ -31,7 +31,6 @@ function formatCurrentDate() {
 const navItems = [
   ["overview", "▦", "개요"],
   ["feedback", "↗", "피드백"],
-  ["ai-feedback", "✓", "AI 피드백 검토"],
   ["loop", "⟳", "학습 루프"],
   ["members", "♙", "사용자 관리"],
   ["help", "?", "도움말"],
@@ -205,8 +204,7 @@ function AdminPage() {
           {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
 
           {activeNav === "overview" && <OverviewContent tracks={feedback} filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} setActiveNav={setActiveNav} reviewItem={reviewItem} trackLoading={trackLoading} onBound={refreshAdminData} notifications={notifications} />}
-          {activeNav === "feedback" && <FeedbackWorkspace filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
-          {activeNav === "ai-feedback" && <AiFeedbackWorkspace />}
+          {activeNav === "feedback" && <FeedbackHub filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
           {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} tracks={feedback} />}
           {activeNav === "members" && <MembersWorkspace />}
           {activeNav === "help" && <HelpWorkspace />}
@@ -244,6 +242,46 @@ function OverviewContent({ tracks, filteredFeedback, filter, setFilter, setActiv
     {selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}
     <ActivityPanel notifications={notifications} />
   </>;
+}
+
+function FeedbackHub({ filteredFeedback, filter, setFilter, reviewItem, onBound, trackLoading, trackError }) {
+  const [feedbackView, setFeedbackView] = useState("identity");
+
+  return (
+    <>
+      <div className="feedback-hub-tabs" role="tablist" aria-label="피드백 유형">
+        <button
+          type="button"
+          className={feedbackView === "identity" ? "selected" : ""}
+          onClick={() => setFeedbackView("identity")}
+        >
+          개체 ID 피드백
+        </button>
+
+        <button
+          type="button"
+          className={feedbackView === "ai" ? "selected" : ""}
+          onClick={() => setFeedbackView("ai")}
+        >
+          AI 피드백 검토
+        </button>
+      </div>
+
+      {feedbackView === "identity" ? (
+        <FeedbackWorkspace
+          filteredFeedback={filteredFeedback}
+          filter={filter}
+          setFilter={setFilter}
+          reviewItem={reviewItem}
+          onBound={onBound}
+          trackLoading={trackLoading}
+          trackError={trackError}
+        />
+      ) : (
+        <AiFeedbackWorkspace />
+      )}
+    </>
+  );
 }
 
 function FeedbackWorkspace({ filteredFeedback, filter, setFilter, reviewItem, onBound, trackLoading, trackError }) {
