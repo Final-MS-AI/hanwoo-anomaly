@@ -170,6 +170,7 @@
   margin-right: auto;
 }
 
+
 .login-brand {
   display: flex;
   flex-direction: column;
@@ -208,6 +209,7 @@
   }
 }
 
+
 .login-brand {
   gap: 10px;
   margin-bottom: 18px;
@@ -241,6 +243,7 @@
   }
 }
 
+
 .login-bull-image {
   width: 125px;
   height: 90px;
@@ -264,6 +267,7 @@
     max-width: 96%;
   }
 }
+
 
 .login-brand {
   display: flex;
@@ -301,6 +305,7 @@
   }
 }
 
+
 .dashboard-cowow-logo {
   display: block;
   width: 190px;
@@ -315,6 +320,7 @@
     height: 46px;
   }
 }
+
 
 /* 앱 공통 구조 */
 
@@ -512,79 +518,6 @@
   }
 }
 
-@media (max-width: 640px) {
-  .dashboard-header.app-header {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 12px 14px;
-  }
-
-  .header-logo-button {
-    flex: 0 0 auto;
-  }
-
-  .dashboard-cowow-logo {
-    width: 92px;
-    height: 34px;
-  }
-
-  .header-actions-right {
-    display: flex;
-    align-items: center;
-    margin-left: auto;
-  }
-
-  .profile-menu-wrapper {
-    flex: 0 0 auto;
-  }
-
-  .profile-menu-button {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
-    padding: 4px 7px;
-    border-radius: 11px;
-  }
-
-  .header-profile-image,
-  .header-guest-profile {
-    width: 28px;
-    height: 28px;
-    font-size: 13px;
-  }
-
-  .header-user-info {
-    display: flex;
-    flex-direction: column;
-    max-width: 92px;
-    min-width: 0;
-  }
-
-  .header-user-info strong {
-    font-size: 10px;
-    line-height: 1.15;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .header-user-info span {
-    max-width: 92px;
-    font-size: 7px;
-    line-height: 1.1;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .profile-menu-arrow {
-    font-size: 8px;
-  }
-}
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -659,6 +592,82 @@
     font-size: 8px;
   }
 }
+
+
+@media (max-width: 640px) {
+  .dashboard-header.app-header {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+
+  .header-logo-button {
+    flex: 0 0 auto;
+  }
+
+  .dashboard-cowow-logo {
+    width: 92px;
+    height: 34px;
+  }
+
+  .header-actions-right {
+    display: flex;
+    align-items: center;
+    margin-left: auto;
+  }
+
+  .profile-menu-wrapper {
+    flex: 0 0 auto;
+  }
+
+  .profile-menu-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    padding: 4px 7px;
+    border-radius: 11px;
+  }
+
+  .header-profile-image,
+  .header-guest-profile {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+
+  .header-user-info {
+    display: flex;
+    flex-direction: column;
+    max-width: 92px;
+    min-width: 0;
+  }
+
+  .header-user-info strong {
+    font-size: 10px;
+    line-height: 1.15;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-user-info span {
+    max-width: 92px;
+    font-size: 7px;
+    line-height: 1.1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .profile-menu-arrow {
+    font-size: 8px;
+  }
+}
+
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -688,6 +697,7 @@
     margin-left: auto;
   }
 }
+
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -737,11 +747,13 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .dashboard-cowow-logo {
     transform: translateY(2px);
   }
 }
+
 
 @media (max-width: 640px) {
   .profile-menu-button {
@@ -799,6 +811,7 @@
     transform: none;
   }
 }
+
 
 /* 모바일 헤더 최종 강제 정렬 */
 @media (max-width: 640px) {
@@ -919,6 +932,7 @@
     display: none !important;
   }
 }
+
 
 /* 모바일 헤더 최종 위치 고정 */
 @media (max-width: 640px) {
@@ -1041,6 +1055,7 @@
     display: none !important;
   }
 }
+
 
 /* 모바일 헤더 위치 최종 수정 */
 @media (max-width: 640px) {
@@ -1193,6 +1208,7 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .profile-menu-button {
     width: 104px;
@@ -1250,6 +1266,7 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex !important;
@@ -1302,6 +1319,7 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex !important;
@@ -1327,6 +1345,7 @@
     margin-left: auto !important;
   }
 }
+
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -1388,6 +1407,7 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     min-height: 42px !important;
@@ -1421,6 +1441,7 @@
     margin: 0 !important;
   }
 }
+
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -1459,6 +1480,7 @@
   }
 }
 
+
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     height: 40px !important;
@@ -1477,3 +1499,4 @@
     min-height: 28px !important;
   }
 }
+
