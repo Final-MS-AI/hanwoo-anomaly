@@ -28,10 +28,11 @@
 .native-google-login-button {
   display: flex;
   align-items: center;
-  justify-content: space-around;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   height: 32px;
-  padding: 0 10px;
+  padding: 0 6px;
   color: #1f1f1f;
   font: inherit;
   font-size: 14px;
@@ -40,6 +41,14 @@
   border: 1px solid #dadce0;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.google-login-logo {
+  display: block;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  object-fit: contain;
 }
 
 .native-google-login-button:disabled {
@@ -161,7 +170,6 @@
   margin-right: auto;
 }
 
-
 .login-brand {
   display: flex;
   flex-direction: column;
@@ -200,7 +208,6 @@
   }
 }
 
-
 .login-brand {
   gap: 10px;
   margin-bottom: 18px;
@@ -234,7 +241,6 @@
   }
 }
 
-
 .login-bull-image {
   width: 125px;
   height: 90px;
@@ -258,7 +264,6 @@
     max-width: 96%;
   }
 }
-
 
 .login-brand {
   display: flex;
@@ -296,7 +301,6 @@
   }
 }
 
-
 .dashboard-cowow-logo {
   display: block;
   width: 190px;
@@ -311,7 +315,6 @@
     height: 46px;
   }
 }
-
 
 /* 앱 공통 구조 */
 
@@ -509,7 +512,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex;
@@ -584,7 +586,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex;
@@ -658,7 +659,6 @@
     font-size: 8px;
   }
 }
-
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -688,7 +688,6 @@
     margin-left: auto;
   }
 }
-
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -738,13 +737,11 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-cowow-logo {
     transform: translateY(2px);
   }
 }
-
 
 @media (max-width: 640px) {
   .profile-menu-button {
@@ -802,7 +799,6 @@
     transform: none;
   }
 }
-
 
 /* 모바일 헤더 최종 강제 정렬 */
 @media (max-width: 640px) {
@@ -923,7 +919,6 @@
     display: none !important;
   }
 }
-
 
 /* 모바일 헤더 최종 위치 고정 */
 @media (max-width: 640px) {
@@ -1046,7 +1041,6 @@
     display: none !important;
   }
 }
-
 
 /* 모바일 헤더 위치 최종 수정 */
 @media (max-width: 640px) {
@@ -1199,7 +1193,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .profile-menu-button {
     width: 104px;
@@ -1257,7 +1250,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex !important;
@@ -1310,7 +1302,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     display: flex !important;
@@ -1336,7 +1327,6 @@
     margin-left: auto !important;
   }
 }
-
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -1398,7 +1388,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     min-height: 42px !important;
@@ -1432,7 +1421,6 @@
     margin: 0 !important;
   }
 }
-
 
 @media (max-width: 640px) {
   .dashboard-header.app-header {
@@ -1471,7 +1459,6 @@
   }
 }
 
-
 @media (max-width: 640px) {
   .dashboard-header.app-header {
     height: 40px !important;
@@ -1490,4 +1477,3 @@
     min-height: 28px !important;
   }
 }
-

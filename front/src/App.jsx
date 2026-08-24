@@ -42,6 +42,8 @@ function LoginPage({ user, setUser }) {
   const location = useLocation();
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isGoogleLoggingIn, setIsGoogleLoggingIn] = useState(false);
+  const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const isAndroidApp = hasAndroidAuthBridge();
@@ -56,7 +58,7 @@ function LoginPage({ user, setUser }) {
         }
 
         setErrorMessage("");
-        setIsLoggingIn(true);
+        setIsGoogleLoggingIn(true);
 
         const authenticatedUser = await exchangeGoogleCredential(credential);
 
@@ -71,7 +73,7 @@ function LoginPage({ user, setUser }) {
           error.message ?? "Google 로그인 정보를 처리하지 못했습니다.",
         );
       } finally {
-        setIsLoggingIn(false);
+        setIsGoogleLoggingIn(false);
       }
     },
     [navigate, setUser],
@@ -91,10 +93,8 @@ function LoginPage({ user, setUser }) {
     };
 
     const handleNativeError = (event) => {
-      setIsLoggingIn(false);
-      setErrorMessage(
-        event.detail?.message ?? "Google 로그인에 실패했습니다.",
-      );
+      setIsGoogleLoggingIn(false);
+      setErrorMessage(event.detail?.message ?? "Google 로그인에 실패했습니다.");
     };
 
     window.addEventListener("cowow:google-login", handleNativeSuccess);
@@ -102,22 +102,19 @@ function LoginPage({ user, setUser }) {
 
     return () => {
       window.removeEventListener("cowow:google-login", handleNativeSuccess);
-      window.removeEventListener(
-        "cowow:google-login-error",
-        handleNativeError,
-      );
+      window.removeEventListener("cowow:google-login-error", handleNativeError);
     };
   }, [completeGoogleLogin, isAndroidApp]);
 
   const handleNativeGoogleLogin = () => {
     setErrorMessage("");
-    setIsLoggingIn(true);
+    setIsGoogleLoggingIn(true);
 
     try {
       window.COWOW_ANDROID.googleLogin();
     } catch (error) {
       console.error("Native Google login error:", error);
-      setIsLoggingIn(false);
+      setIsGoogleLoggingIn(false);
       setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
     }
   };
@@ -125,16 +122,16 @@ function LoginPage({ user, setUser }) {
   const handleGuestLogin = async () => {
     try {
       setErrorMessage("");
-      setIsLoggingIn(true);
+      setIsGuestLoggingIn(true);
 
       const guestUser = await createGuestSession();
       setUser(guestUser);
-    navigate(location.state?.from ?? "/dashboard");
+      navigate(location.state?.from ?? "/dashboard");
     } catch (error) {
       console.error("Guest login error:", error);
       setErrorMessage(error.message ?? "게스트 로그인에 실패했습니다.");
     } finally {
-      setIsLoggingIn(false);
+      setIsGuestLoggingIn(false);
     }
   };
 
@@ -156,7 +153,13 @@ function LoginPage({ user, setUser }) {
   if (user) {
     return (
       <Navigate
-        to={isAdminLogin ? "/admin" : user.loginType === "admin" ? "/admin" : "/dashboard"}
+        to={
+          isAdminLogin
+            ? "/admin"
+            : user.loginType === "admin"
+              ? "/admin"
+              : "/dashboard"
+        }
         replace
       />
     );
@@ -186,11 +189,15 @@ function LoginPage({ user, setUser }) {
                 className="native-google-login-button"
                 type="button"
                 onClick={handleNativeGoogleLogin}
-                disabled={isLoggingIn}
+                disabled={isGoogleLoggingIn}
+                aria-label="Google 로그인"
               >
-                <span>
-                  {isLoggingIn ? "Google 로그인 중" : "Google로 로그인"}
-                </span>
+                <img
+                  className="google-login-logo"
+                  src="/google-g-logo.svg"
+                  alt=""
+                />
+                <span>{isGoogleLoggingIn ? "로그인 중" : "로그인"}</span>
               </button>
             ) : GOOGLE_CLIENT_ID ? (
               <GoogleLogin
@@ -245,18 +252,33 @@ function LoginPage({ user, setUser }) {
             className="guest-login-button"
             type="button"
             onClick={handleGuestLogin}
-            disabled={isLoggingIn}
+            disabled={isGuestLoggingIn}
           >
-            {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
+            {isGuestLoggingIn ? "로그인 중..." : "게스트로 로그인"}
           </button>
         )}
 
         {isAdminLogin && (
           <>
             <form className="admin-login-form" onSubmit={handleAdminLogin}>
-              <input value={adminUsername} onChange={(event) => setAdminUsername(event.target.value)} placeholder="관리자 아이디" autoComplete="username" required />
-              <input value={adminPassword} onChange={(event) => setAdminPassword(event.target.value)} placeholder="비밀번호" type="password" autoComplete="current-password" required />
-              <button type="submit" disabled={isLoggingIn}>{isLoggingIn ? "로그인 중…" : "관리자로 로그인"}</button>
+              <input
+                value={adminUsername}
+                onChange={(event) => setAdminUsername(event.target.value)}
+                placeholder="관리자 아이디"
+                autoComplete="username"
+                required
+              />
+              <input
+                value={adminPassword}
+                onChange={(event) => setAdminPassword(event.target.value)}
+                placeholder="비밀번호"
+                type="password"
+                autoComplete="current-password"
+                required
+              />
+              <button type="submit" disabled={isLoggingIn}>
+                {isLoggingIn ? "로그인 중…" : "관리자로 로그인"}
+              </button>
             </form>
           </>
         )}
@@ -339,38 +361,40 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
       if (result.success) {
         setOcrStatus("success");
         setOcrMessage(
-          "사진에서 귀표 번호를 정상적으로 인식했습니다. 결과를 확인해 주세요."
+          "사진에서 귀표 번호를 정상적으로 인식했습니다. 결과를 확인해 주세요.",
         );
       } else if (result.reason === "single_image_unconfirmed") {
         setOcrStatus("warning");
         setOcrMessage(
-          "귀표 번호를 인식했지만 정확한 등록을 위해 사용자 확인이 필요합니다."
+          "귀표 번호를 인식했지만 정확한 등록을 위해 사용자 확인이 필요합니다.",
         );
       } else if (result.reason === "ear_tag_not_detected") {
         setOcrStatus("error");
         setOcrMessage(
-          "사진에서 귀표를 찾지 못했습니다. 귀표가 화면에 크게 보이도록 다시 촬영해 주세요."
+          "사진에서 귀표를 찾지 못했습니다. 귀표가 화면에 크게 보이도록 다시 촬영해 주세요.",
         );
       } else if (result.reason === "crop_quality_rejected") {
         setOcrStatus("error");
         setOcrMessage(
-          "귀표는 감지했지만 이미지 품질이 낮아 번호를 판독하지 못했습니다. 흔들림, 거리, 빛 반사를 확인한 뒤 다시 촬영해 주세요."
+          "귀표는 감지했지만 이미지 품질이 낮아 번호를 판독하지 못했습니다. 흔들림, 거리, 빛 반사를 확인한 뒤 다시 촬영해 주세요.",
         );
       } else if (result.reason === "ear_tag_number_not_found") {
         setOcrStatus("error");
         setOcrMessage(
-          "귀표는 감지했지만 번호를 읽지 못했습니다. 더 선명한 사진으로 다시 시도하거나 귀표 번호를 직접 입력해 주세요."
+          "귀표는 감지했지만 번호를 읽지 못했습니다. 더 선명한 사진으로 다시 시도하거나 귀표 번호를 직접 입력해 주세요.",
         );
       } else {
         setOcrStatus("error");
         setOcrMessage(
-          "귀표 번호를 자동으로 판독하지 못했습니다. 다른 사진으로 다시 시도하거나 직접 입력해 주세요."
+          "귀표 번호를 자동으로 판독하지 못했습니다. 다른 사진으로 다시 시도하거나 직접 입력해 주세요.",
         );
       }
     } catch (error) {
       console.error("Ear tag OCR error:", error);
       setOcrStatus("error");
-      setOcrMessage("자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.");
+      setOcrMessage(
+        "자동 인식에 실패했습니다. 귀표 번호를 직접 입력해 주세요.",
+      );
     }
   };
 
@@ -494,13 +518,14 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
     } catch (error) {
       console.error("Cattle registration error:", error);
       setErrorMessage(
-      "비문 등록은 완료되었습니다. 개체 기본정보 저장은 백엔드 준비 중입니다.",
-    );
+        "비문 등록은 완료되었습니다. 개체 기본정보 저장은 백엔드 준비 중입니다.",
+      );
       setIsSubmitting(false);
     }
   };
 
-  const enrollData = enrollResult?.status === "success" ? enrollResult.data : null;
+  const enrollData =
+    enrollResult?.status === "success" ? enrollResult.data : null;
   const consistency =
     typeof enrollData?.consistency === "number" ? enrollData.consistency : null;
 
@@ -577,11 +602,9 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
                   <span className="ocr-status-badge error">직접 입력</span>
                 )}
               </div>
-
               {ocrMessage && (
                 <span className={`ocr-message ${ocrStatus}`}>{ocrMessage}</span>
               )}
-
               {ocrResult &&
                 ocrStatus === "error" &&
                 [
@@ -611,87 +634,78 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
                     </span>
                   </section>
                 )}
-
               {ocrResult?.ocr_log_id &&
                 (ocrResult.success ||
                   ocrResult.reason === "single_image_unconfirmed") && (
                   <section className="ocr-visualization">
-                  <div className="ocr-visualization-header">
-                    <strong>AI 귀표 분석 과정</strong>
-                    <span>
-                      객체 탐지 후 OCR로 귀표 번호를 판독합니다.
-                    </span>
-                  </div>
+                    <div className="ocr-visualization-header">
+                      <strong>AI 귀표 분석 과정</strong>
+                      <span>객체 탐지 후 OCR로 귀표 번호를 판독합니다.</span>
+                    </div>
 
-                  <div className="ocr-visualization-grid">
-                    <article className="ocr-visualization-card">
-                      <div className="ocr-step-label">
-                        1. YOLO 귀표 위치 탐지
+                    <div className="ocr-visualization-grid">
+                      <article className="ocr-visualization-card">
+                        <div className="ocr-step-label">
+                          1. YOLO 귀표 위치 탐지
+                        </div>
+
+                        <img
+                          className="ocr-visualization-image"
+                          src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/annotated`}
+                          alt="YOLO가 귀표 위치를 탐지한 결과"
+                        />
+
+                        <span className="ocr-visualization-caption">
+                          AI가 이미지에서 귀표 위치를 Bounding Box로 탐지합니다.
+                        </span>
+                      </article>
+
+                      <article className="ocr-visualization-card">
+                        <div className="ocr-step-label">2. OCR 분석 영역</div>
+
+                        <img
+                          className="ocr-visualization-image crop"
+                          src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/evidence`}
+                          alt="OCR에 사용된 귀표 영역"
+                        />
+
+                        <span className="ocr-visualization-caption">
+                          탐지한 귀표 영역만 잘라 OCR 판독에 사용합니다.
+                        </span>
+                      </article>
+                    </div>
+
+                    <div className="ocr-visualization-result">
+                      <div>
+                        <span>판독 귀표번호</span>
+                        <strong>{ocrResult.ear_tag_number ?? "-"}</strong>
                       </div>
 
-                      <img
-                        className="ocr-visualization-image"
-                        src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/annotated`}
-                        alt="YOLO가 귀표 위치를 탐지한 결과"
-                      />
-
-                      <span className="ocr-visualization-caption">
-                        AI가 이미지에서 귀표 위치를 Bounding Box로 탐지합니다.
-                      </span>
-                    </article>
-
-                    <article className="ocr-visualization-card">
-                      <div className="ocr-step-label">
-                        2. OCR 분석 영역
+                      <div>
+                        <span>OCR 신뢰도</span>
+                        <strong>
+                          {Math.round((ocrResult.confidence ?? 0) * 1000) / 10}%
+                        </strong>
                       </div>
 
-                      <img
-                        className="ocr-visualization-image crop"
-                        src={`${API_BASE_URL}/ocr/results/${ocrResult.ocr_log_id}/evidence`}
-                        alt="OCR에 사용된 귀표 영역"
-                      />
+                      <div>
+                        <span>등록 개체</span>
+                        <strong>
+                          {ocrResult.registered ? "확인됨" : "미등록"}
+                        </strong>
+                      </div>
 
-                      <span className="ocr-visualization-caption">
-                        탐지한 귀표 영역만 잘라 OCR 판독에 사용합니다.
-                      </span>
-                    </article>
-                  </div>
-
-                  <div className="ocr-visualization-result">
-                    <div>
-                      <span>판독 귀표번호</span>
-                      <strong>
-                        {ocrResult.ear_tag_number ?? "-"}
-                      </strong>
+                      <div>
+                        <span>판독 상태</span>
+                        <strong>
+                          {ocrResult.requires_human_confirmation
+                            ? "사용자 확인 필요"
+                            : "확인 완료"}
+                        </strong>
+                      </div>
                     </div>
-
-                    <div>
-                      <span>OCR 신뢰도</span>
-                      <strong>
-                        {Math.round(
-                          (ocrResult.confidence ?? 0) * 1000
-                        ) / 10}%
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>등록 개체</span>
-                      <strong>
-                        {ocrResult.registered ? "확인됨" : "미등록"}
-                      </strong>
-                    </div>
-
-                    <div>
-                      <span>판독 상태</span>
-                      <strong>
-                        {ocrResult.requires_human_confirmation
-                          ? "사용자 확인 필요"
-                          : "확인 완료"}
-                      </strong>
-                    </div>
-                  </div>
-                </section>
-              )}
+                  </section>
+                )}
             </label>
           )}
 
@@ -702,7 +716,6 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
               전신이 나오면 인식되지 않습니다. 각도를 바꿔 3장 이상 선택하면
               정확도가 올라갑니다.
             </span>
-
             <input
               type="file"
               name="muzzle_files"
@@ -710,7 +723,6 @@ function RegisterCattleModal({ onClose, onRegistered, embedded = false }) {
               multiple
               onChange={handleMuzzleFilesChange}
             />
-
             {muzzleFiles.length > 0 && (
               <div style={{ marginTop: 8 }}>
                 <b>{muzzleFiles.length}장 선택됨</b>
@@ -949,7 +961,15 @@ function DashboardPage({ user, setUser }) {
             boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
           }}
         >
-          <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "16px" }}>급이대 구역 지정하기</div>
+          <div
+            style={{
+              fontSize: "1.35rem",
+              fontWeight: 700,
+              marginBottom: "16px",
+            }}
+          >
+            급이대 구역 지정하기
+          </div>
           <iframe
             src="/zone-setup.html"
             title="급이대 구역 지정"
@@ -958,32 +978,42 @@ function DashboardPage({ user, setUser }) {
               const fit = () => {
                 try {
                   const d = ev.target.contentWindow.document;
-                  ev.target.style.height = d.documentElement.scrollHeight + "px";
+                  ev.target.style.height =
+                    d.documentElement.scrollHeight + "px";
                 } catch (err) {}
               };
               fit();
               setInterval(fit, 500);
             }}
-            style={{ width: "100%", height: "600px", border: "none", borderRadius: "12px", display: "block", overflow: "hidden" }}
+            style={{
+              width: "100%",
+              height: "600px",
+              border: "none",
+              borderRadius: "12px",
+              display: "block",
+              overflow: "hidden",
+            }}
           />
         </div>
       )}
       {location.pathname === "/cattle/register" && (
         <RegisterCattleModal
-            embedded
-            onClose={() => navigate("/dashboard")}
-            onRegistered={() => {
-              window.alert("소 등록이 완료되었습니다.");
-              navigate("/dashboard");
-            }}
-          />
+          embedded
+          onClose={() => navigate("/dashboard")}
+          onRegistered={() => {
+            window.alert("소 등록이 완료되었습니다.");
+            navigate("/dashboard");
+          }}
+        />
       )}
 
       {location.pathname === "/chat" && <RagChatbot />}
 
       {location.pathname === "/control" && <BarnEnvironmentControl />}
 
-      {location.pathname === "/devices/setup" && <DeviceSetupPage user={user} />}
+      {location.pathname === "/devices/setup" && (
+        <DeviceSetupPage user={user} />
+      )}
 
       <BottomNavigation />
     </main>
