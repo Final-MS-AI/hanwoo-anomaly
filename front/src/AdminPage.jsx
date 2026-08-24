@@ -31,6 +31,7 @@ const navItems = [
   ["feedback", "↗", "피드백"],
   ["loop", "⟳", "학습 루프"],
   ["members", "♙", "사용자 관리"],
+  ["help", "?", "도움말"],
 ];
 
 function trackToFeedback(track) {
@@ -188,6 +189,7 @@ function AdminPage() {
           {activeNav === "feedback" && <FeedbackWorkspace filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
           {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} />}
           {activeNav === "members" && <MembersWorkspace />}
+          {activeNav === "help" && <HelpWorkspace />}
         </div>
       </section>
     </main>
@@ -374,6 +376,36 @@ function MembersWorkspace() {
     if (response.ok) loadMembers();
   };
   return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>{(member.name || member.email || "A").slice(0, 2).toUpperCase()}</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)} disabled={!canRevoke || member.provider === "admin"} title={member.provider === "admin" ? "최고 관리자 계정은 해제할 수 없습니다." : !canRevoke ? "최고 관리자만 해제할 수 있습니다." : "관리자 권한 해제"}>{member.provider === "admin" ? "최고 관리자" : "해제"}</button></div>)}{members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+}
+
+function HelpWorkspace() {
+  return <div className="help-workspace">
+    <section className="admin-panel full-panel help-hero">
+      <p className="eyebrow">ADMIN GUIDE</p>
+      <h2>관리자 페이지 사용 안내</h2>
+      <p>한우 영상에서 확인된 트랙과 ID 역전파 상태를 확인하고, 필요한 경우 개체 ID를 직접 연결할 수 있습니다.</p>
+    </section>
+    <div className="help-card-grid">
+      <HelpCard number="01" title="개요" tone="blue"><p>전체 트랙 수, 검토 대기 트랙, 바인딩 적용률을 한눈에 확인합니다.</p><small>카드의 수치는 muzzle API에서 최신 데이터를 받아 표시합니다.</small></HelpCard>
+      <HelpCard number="02" title="피드백" tone="orange"><p>미확정 트랙을 확인하고 상세 정보 화면으로 이동합니다.</p><small>목록의 <strong>상세</strong> 버튼을 누르면 카메라, 세션, 프레임 수를 확인할 수 있습니다.</small></HelpCard>
+      <HelpCard number="03" title="ID 바인딩" tone="green"><p>상세 화면에서 가축이력번호와 유사도를 입력해 트랙에 ID를 연결합니다.</p><small>유사도는 운영 기준 0.70 이상이어야 하며, 적용 후 과거 관측에 ID가 역전파됩니다.</small></HelpCard>
+      <HelpCard number="04" title="알림" tone="purple"><p>우측 상단 알림 버튼에서 바인딩, 해제, 권한 변경 기록을 확인합니다.</p><small>알림을 누르면 읽음 처리되고, 모두 읽음으로 전체 상태를 변경할 수 있습니다.</small></HelpCard>
+      <HelpCard number="05" title="사용자 관리" tone="slate"><p>이미 가입한 사용자의 이메일을 등록해 관리자 권한을 부여합니다.</p><small>최고 관리자 계정만 다른 관리자의 권한을 해제할 수 있습니다.</small></HelpCard>
+      <HelpCard number="06" title="새로고침과 오류" tone="red"><p>데이터 새로고침은 트랙과 알림을 다시 조회합니다.</p><small>API 오류가 계속되면 로그인 상태, 서버 상태, 네트워크 연결을 확인하세요.</small></HelpCard>
+    </div>
+    <section className="admin-panel full-panel help-steps-panel">
+      <div className="panel-heading"><div><h2>검토 대기 트랙 처리 순서</h2><p>처음 사용하는 경우 아래 순서대로 진행하세요.</p></div></div>
+      <div className="help-steps"><HelpStep number="1" title="피드백 열기" detail="왼쪽 메뉴에서 피드백을 선택합니다." /><HelpStep number="2" title="상세 확인" detail="확인할 트랙의 상세 버튼을 누릅니다." /><HelpStep number="3" title="정보 입력" detail="가축이력번호와 유사도를 입력합니다." /><HelpStep number="4" title="바인딩 적용" detail="ID 바인딩 적용을 눌러 역전파를 실행합니다." /></div>
+    </section>
+  </div>;
+}
+
+function HelpCard({ number, title, tone, children }) {
+  return <article className={`help-card ${tone}`}><span>{number}</span><h3>{title}</h3>{children}</article>;
+}
+
+function HelpStep({ number, title, detail }) {
+  return <div className="help-step"><b>{number}</b><div><strong>{title}</strong><small>{detail}</small></div></div>;
 }
 
 function LoopCard({ tracks, setActiveNav }) {
