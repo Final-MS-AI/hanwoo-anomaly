@@ -180,7 +180,7 @@ function AdminPage() {
         </header>
 
         <div className="admin-main">
-          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]} <span>✦</span></h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
+          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]}</h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
 
           {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
 
