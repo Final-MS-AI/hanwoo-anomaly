@@ -95,23 +95,12 @@ function equipmentDecision(telemetry, controls = []) {
   return { title: "추가 설비 불필요", detail: `최근 7일 ${samples}건 기준 정상 범위 유지` };
 }
 
-function printReport() {
-  const report = document.querySelector(".operations-report");
-  if (!report) return;
-
-  // Print a document containing only the report. Printing the SPA modal itself
-  // leaves its fixed backdrop/layout in Chrome's print tree and causes blank pages.
-  const printWindow = window.open("", "_blank");
-  if (!printWindow) {
-    window.print();
-    return;
-  }
-
+function buildPrintDocument(report) {
   const stylesheets = [...document.querySelectorAll('link[rel="stylesheet"]')]
     .map((link) => `<link rel="stylesheet" href="${link.href}">`)
     .join("");
 
-  printWindow.document.write(`<!doctype html>
+  return `<!doctype html>
     <html lang="ko"><head><meta charset="utf-8"><title>COWOW 축사 운영 보고서</title>
     ${stylesheets}
     <style>
@@ -123,9 +112,38 @@ function printReport() {
       .operations-report-header, .report-overview, .report-history-detail > div, .report-cattle-item { break-inside: avoid; page-break-inside: avoid; }
       .report-section-heading { break-after: avoid; page-break-after: avoid; }
       .report-section { margin-top: 16px; }
-    </style></head><body>${report.outerHTML}
-    <script>window.addEventListener('load', () => setTimeout(() => { window.focus(); window.print(); }, 250));</script>
-    </body></html>`);
+    </style></head><body>${report.outerHTML}</body></html>`;
+}
+
+function printReport() {
+  const report = document.querySelector(".operations-report");
+  if (!report) return;
+
+  const printHtml = buildPrintDocument(report);
+
+  // Expo/React Native WebView cannot open a browser print popup reliably.
+  // Send the self-contained report document to the native app instead.
+  if (typeof window.ReactNativeWebView?.postMessage === "function") {
+    window.ReactNativeWebView.postMessage(JSON.stringify({
+      type: "COWOW_PRINT_REPORT",
+      title: "COWOW 축사 운영 보고서",
+      html: printHtml,
+    }));
+    return;
+  }
+
+  // Print a document containing only the report. Printing the SPA modal itself
+  // leaves its fixed backdrop/layout in Chrome's print tree and causes blank pages.
+  const printWindow = window.open("", "_blank");
+  if (!printWindow) {
+    window.print();
+    return;
+  }
+
+  printWindow.document.write(printHtml.replace(
+    "</body></html>",
+    "<script>window.addEventListener('load', () => setTimeout(() => { window.focus(); window.print(); }, 250));</script></body></html>",
+  ));
   printWindow.document.close();
 }
 
