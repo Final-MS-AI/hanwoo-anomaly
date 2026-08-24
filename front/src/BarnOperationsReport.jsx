@@ -212,6 +212,9 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const airStatus = sensorStatus(hasHistory ? periodSensors.airQuality?.max : sensors.airQuality, 55, 75);
   const priorityCattle = groupedCattle.filter((item) => item.status === "danger" || item.status === "warning");
   const hasEnvironmentalRisk = [temperatureStatus, humidityStatus, airStatus].some((item) => item.level === "danger" || item.level === "warning");
+  const reportDevice = reportData?.device;
+  const deviceOnline = reportDevice?.online ?? deviceState?.online;
+  const lastDeviceSeenAt = reportDevice?.lastSeenAt ?? deviceState?.lastSeenAt;
 
   return (
     <div className="operations-report-backdrop" role="dialog" aria-modal="true" aria-label="축사 운영 보고서" onClick={onClose}>
@@ -231,7 +234,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
         <section className="report-overview">
           <div><span>위험 개체</span><strong>{groupedCattle.filter((item) => item.status === "danger").length}마리</strong></div>
           <div><span>주의 개체</span><strong>{groupedCattle.filter((item) => item.status === "warning").length}마리</strong></div>
-          <div><span>장비 상태</span><strong className={deviceState?.online ? "report-ok" : "report-caution"}>{deviceState?.online ? "온라인" : "확인 필요"}</strong></div>
+          <div><span>장비 상태</span><strong className={deviceOnline ? "report-ok" : "report-caution"}>{deviceOnline ? "온라인" : "통신 확인 중"}</strong><small>{lastDeviceSeenAt ? `최근 통신 ${formatDate(lastDeviceSeenAt)}` : "최근 통신 정보 없음"}</small></div>
           <div><span>기준 시각</span><strong>{formatDate(updatedAt)}</strong></div>
         </section>
 
