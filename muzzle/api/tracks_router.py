@@ -116,6 +116,56 @@ def unbind(segment_id: int):
     return {"segment_id": segment_id, "status": "unbound"}
 
 
+@router.get("/tracks/bindings/recent")
+def recent_bindings(limit: int = Query(10, ge=1, le=50)):
+    """최근 활성 ID 바인딩 작업과 소급 반영 관측 수를 조회한다."""
+    with conn() as c:
+        rows = c.execute("""
+            SELECT b.segment_id, b.national_id, b.source, b.similarity, b.decided_at,
+                   s.camera_id, s.track_id, s.session_id, s.frame_count
+            FROM public.track_identity_binding b
+            JOIN public.track_segment s ON s.id = b.segment_id
+            WHERE b.is_active
+            ORDER BY b.decided_at DESC NULLS LAST, b.segment_id DESC
+            LIMIT %s
+        """, (limit,)).fetchall()
+    return {"count": len(rows), "bindings": [
+        {
+            "segment_id": r[0], "national_id": r[1], "source": r[2],
+            "similarity": r[3], "decided_at": r[4], "camera_id": r[5],
+            "track_id": r[6], "session_id": r[7], "frame_count": r[8],
+            "affected_observations": r[8],
+        }
+        for r in rows
+    ]}
+
+
+@router.post("/tracks/{segment_id}/review")
+def review_track(segment_id: int,
+                 status: str = Query(..., pattern="^(approved|held)$"),
+                 admin=Depends(require_admin)):
+    """관리자 검토 결과를 DB에 저장한다."""
+    with conn() as c:
+        if not c.execute("SELECT 1 FROM public.track_segment WHERE id=%s", (segment_id,)).fetchone():
+            raise HTTPException(404, "segment_not_found")
+        c.execute("""
+            INSERT INTO public.track_feedback_reviews (segment_id, status, reviewer_user_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (segment_id) DO UPDATE SET
+                status=EXCLUDED.status, reviewer_user_id=EXCLUDED.reviewer_user_id,
+                reviewed_at=NOW()
+        """, (segment_id, status, admin["id"]))
+        c.commit()
+    _notify(
+        "track_reviewed",
+        "트랙 검토 상태가 변경되었습니다",
+        f"segment #{segment_id} 검토 결과: {'승인' if status == 'approved' else '보류'}",
+        "success" if status == "approved" else "warning",
+        segment_id,
+    )
+    return {"segment_id": segment_id, "status": status}
+
+
 @router.get("/tracks/{segment_id}")
 def get_track(segment_id: int):
     with conn() as c:
@@ -146,10 +196,13 @@ def list_tracks(camera_id: str | None = None, bound: bool | None = None, limit: 
     elif bound is False:
         where.append("b.national_id IS NULL")
 
-    q = """SELECT s.id, s.camera_id, s.track_id, s.started_at, s.frame_count, b.national_id
+    q = """SELECT s.id, s.camera_id, s.track_id, s.started_at, s.frame_count, b.national_id,
+                   r.status
            FROM public.track_segment s
            LEFT JOIN public.track_identity_binding b
-             ON b.segment_id = s.id AND b.is_active"""
+             ON b.segment_id = s.id AND b.is_active
+           LEFT JOIN public.track_feedback_reviews r
+             ON r.segment_id = s.id"""
     if where:
         q += " WHERE " + " AND ".join(where)
     q += " ORDER BY s.id DESC LIMIT %s"
@@ -159,7 +212,8 @@ def list_tracks(camera_id: str | None = None, bound: bool | None = None, limit: 
         rows = c.execute(q, params).fetchall()
     return {"count": len(rows), "tracks": [
         {"segment_id": r[0], "camera_id": r[1], "track_id": r[2],
-         "started_at": r[3], "frame_count": r[4], "national_id": r[5]} for r in rows]}
+         "started_at": r[3], "frame_count": r[4], "national_id": r[5],
+         "review_status": r[6]} for r in rows]}
 
 
 def _count(c, segment_id: int) -> int:
