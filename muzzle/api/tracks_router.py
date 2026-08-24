@@ -23,6 +23,21 @@ def conn():
     return psycopg.connect(DSN)
 
 
+def _notify(event_type, title, message, severity="info", segment_id=None):
+    """알림 저장 실패가 핵심 바인딩 작업을 실패시키지 않도록 별도로 기록한다."""
+    try:
+        with conn() as c:
+            c.execute(
+                """INSERT INTO public.admin_notifications
+                   (event_type, title, message, severity, related_segment_id)
+                   VALUES (%s, %s, %s, %s, %s)""",
+                (event_type, title, message, severity, segment_id),
+            )
+            c.commit()
+    except psycopg.Error:
+        pass
+
+
 @router.post("/tracks/{segment_id}/bind")
 def bind(segment_id: int,
          national_id: str = Query(..., min_length=1),
@@ -70,6 +85,13 @@ def bind(segment_id: int,
         n = _count(c, segment_id)
         c.commit()
 
+    _notify(
+        "track_bound",
+        "ID 역전파 바인딩이 적용되었습니다",
+        f"segment #{segment_id}을(를) 한우 {national_id}에 연결하고 과거 관측 {n}건에 반영했습니다.",
+        "success",
+        segment_id,
+    )
     return {"segment_id": segment_id, "national_id": national_id, "similarity": similarity,
             "status": "replaced" if replaced else "bound",
             "replaced_national_id": replaced, "affected_observations": n}
@@ -84,6 +106,13 @@ def unbind(segment_id: int):
         c.commit()
     if not n:
         raise HTTPException(404, "no_active_binding")
+    _notify(
+        "track_unbound",
+        "트랙 바인딩이 해제되었습니다",
+        f"segment #{segment_id}의 ID 바인딩을 해제했습니다.",
+        "warning",
+        segment_id,
+    )
     return {"segment_id": segment_id, "status": "unbound"}
 
 

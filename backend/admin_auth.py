@@ -10,6 +10,7 @@ import psycopg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
 
 from auth_session import COOKIE_NAME, read_user_id
+from admin_notification_store import create_admin_notification
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -80,6 +81,13 @@ def grant_admin(user_id: int, admin=Depends(require_admin)):
             (user_id, admin["id"]),
         )
         connection.commit()
+    create_admin_notification(
+        "admin_granted",
+        "관리자 권한이 추가되었습니다",
+        f"{user_id}번 사용자에게 관리자 권한을 부여했습니다.",
+        severity="success",
+        event_key=f"admin-granted:{user_id}",
+    )
     return {"user_id": user_id, "status": "admin"}
 
 
@@ -105,4 +113,11 @@ def revoke_admin(user_id: int, admin=Depends(require_admin)):
         connection.commit()
     if not deleted:
         raise HTTPException(404, "관리자를 찾을 수 없습니다.")
+    create_admin_notification(
+        "admin_revoked",
+        "관리자 권한이 해제되었습니다",
+        f"{user_id}번 사용자의 관리자 권한을 해제했습니다.",
+        severity="warning",
+        event_key=None,
+    )
     return {"user_id": user_id, "status": "revoked"}
