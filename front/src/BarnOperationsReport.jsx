@@ -57,8 +57,24 @@ function sensorStatus(value, warning, danger) {
   return { label: "정상", level: "normal" };
 }
 
+function formatMetric(value, unit = "") {
+  return Number.isFinite(Number(value)) ? `${Number(value).toFixed(1)}${unit}` : "-";
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  return hours ? `${hours}시간 ${minutes}분` : `${minutes}분`;
+}
+
+function actuatorName(value) {
+  return { ventilation_fan: "환기 팬", water_sprayer: "살수 장치", humidifier: "가습 장치" }[value] || value;
+}
+
 function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const [deviceState, setDeviceState] = useState(null);
+  const [reportData, setReportData] = useState(null);
   const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
@@ -68,6 +84,12 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
     async function loadDeviceState() {
       try {
         setLoadError("");
+        const reportResponse = await fetch(`${API_BASE_URL}/api/reports/barn?days=7`, {
+          credentials: "include",
+          signal: controller.signal,
+        });
+        const report = await reportResponse.json().catch(() => ({}));
+        if (reportResponse.ok) setReportData(report);
         const devicesResponse = await fetch(`${API_BASE_URL}/devices/mine`, {
           credentials: "include",
           signal: controller.signal,
@@ -94,6 +116,13 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   }, [open]);
 
   const sensors = deviceState?.sensors || {};
+  const telemetry = reportData?.telemetry;
+  const hasHistory = Boolean(telemetry?.sampleCount);
+  const periodSensors = {
+    temperature: telemetry?.temperature,
+    humidity: telemetry?.humidity,
+    airQuality: telemetry?.airQuality,
+  };
   const groupedCattle = useMemo(() => {
     const map = new Map();
     cattle.forEach((item) => {
@@ -110,11 +139,18 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   }, [cattle]);
 
   if (!open) return null;
-  const recommendations = recommendationFor(sensors, groupedCattle);
+  const recommendationSensors = hasHistory
+    ? {
+        temperature: periodSensors.temperature?.max,
+        humidity: periodSensors.humidity?.max,
+        airQuality: periodSensors.airQuality?.max,
+      }
+    : sensors;
+  const recommendations = recommendationFor(recommendationSensors, groupedCattle);
   const titleDate = new Intl.DateTimeFormat("ko-KR", { dateStyle: "long", timeZone: "Asia/Seoul" }).format(new Date());
-  const temperatureStatus = sensorStatus(sensors.temperature, 28, 32);
-  const humidityStatus = sensorStatus(sensors.humidity, 75, 85);
-  const airStatus = sensorStatus(sensors.airQuality, 55, 75);
+  const temperatureStatus = sensorStatus(hasHistory ? periodSensors.temperature?.max : sensors.temperature, 28, 32);
+  const humidityStatus = sensorStatus(hasHistory ? periodSensors.humidity?.max : sensors.humidity, 75, 85);
+  const airStatus = sensorStatus(hasHistory ? periodSensors.airQuality?.max : sensors.airQuality, 55, 75);
   const priorityCattle = groupedCattle.filter((item) => item.status === "danger" || item.status === "warning");
   const hasEnvironmentalRisk = [temperatureStatus, humidityStatus, airStatus].some((item) => item.level === "danger" || item.level === "warning");
 
@@ -125,7 +161,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
           <div>
             <span> COWOW 축사 운영 리포트</span>
             <h2>{titleDate} 환경·이상행동 보고서</h2>
-            <p>대시보드와 ESP32에서 수집한 최신 상태를 기반으로 작성되었습니다.</p>
+            <p>ESP32가 연결된 기간 동안 누적한 센서·제어·이상행동 이력을 기반으로 작성되었습니다.</p>
           </div>
           <div className="operations-report-actions">
             <button type="button" onClick={() => window.print()}>인쇄 / PDF 저장</button>
@@ -163,18 +199,25 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
         </section>
 
         <section className="report-section">
-          <div className="report-section-heading"><div><span>02 · 환경 상태</span><h3>환경 센서 현황과 설비 판단</h3></div><small>장비 {deviceState?.publicDeviceNumber || "미연결"}</small></div>
+          <div className="report-section-heading"><div><span>02 · 환경 이력</span><h3>최근 7일 센서 추세와 설비 판단</h3></div><small>장비 {deviceState?.publicDeviceNumber || reportData?.deviceId || "미연결"}</small></div>
           {loadError ? <p className="report-note">{loadError}</p> : (
             <div className="report-sensor-grid">
-              <div><span>온도 <b className={`sensor-status ${temperatureStatus.level}`}>{temperatureStatus.label}</b></span><strong>{valueOrDash(sensors.temperature, "°C")}</strong><small>주의 28°C · 위험 32°C</small></div>
-              <div><span>습도 <b className={`sensor-status ${humidityStatus.level}`}>{humidityStatus.label}</b></span><strong>{valueOrDash(sensors.humidity, "%")}</strong><small>주의 75% · 위험 85%</small></div>
-              <div><span>공기질 <b className={`sensor-status ${airStatus.level}`}>{airStatus.label}</b></span><strong>{valueOrDash(sensors.airQuality, "%")}</strong><small>주의 55% · 위험 75%</small></div>
+              <div><span>온도 <b className={`sensor-status ${temperatureStatus.level}`}>{temperatureStatus.label}</b></span><strong>{hasHistory ? `평균 ${formatMetric(periodSensors.temperature?.average, "°C")}` : valueOrDash(sensors.temperature, "°C")}</strong><small>{hasHistory ? `최저 ${formatMetric(periodSensors.temperature?.min, "°C")} · 최고 ${formatMetric(periodSensors.temperature?.max, "°C")}` : "이력 수집 시작 대기"}</small></div>
+              <div><span>습도 <b className={`sensor-status ${humidityStatus.level}`}>{humidityStatus.label}</b></span><strong>{hasHistory ? `평균 ${formatMetric(periodSensors.humidity?.average, "%")}` : valueOrDash(sensors.humidity, "%")}</strong><small>{hasHistory ? `최저 ${formatMetric(periodSensors.humidity?.min, "%")} · 최고 ${formatMetric(periodSensors.humidity?.max, "%")}` : "이력 수집 시작 대기"}</small></div>
+              <div><span>공기질 <b className={`sensor-status ${airStatus.level}`}>{airStatus.label}</b></span><strong>{hasHistory ? `평균 ${formatMetric(periodSensors.airQuality?.average, "%")}` : valueOrDash(sensors.airQuality, "%")}</strong><small>{hasHistory ? `최저 ${formatMetric(periodSensors.airQuality?.min, "%")} · 최고 ${formatMetric(periodSensors.airQuality?.max, "%")}` : "이력 수집 시작 대기"}</small></div>
             </div>
           )}
           <div className="report-history-notice">
-            <strong>기간 분석 데이터 수집 상태</strong>
-            <p>현재는 최신 센서 상태를 표시합니다. 다음 수집 주기부터 최고·최저 시각, 고온·고습 지속시간, 팬·살수 가동시간, 조치 전후 온도 변화가 기간 보고서에 누적됩니다.</p>
+            <strong>{hasHistory ? `기간 분석 완료 · ${telemetry.sampleCount}건 수집` : "기간 분석 데이터 수집 중"}</strong>
+            <p>{hasHistory ? "표시값은 실시간 한 건이 아니라 저장된 센서 이력의 평균·최저·최고값입니다. 제어 가동시간은 완료된 ON/OFF 명령을 기준으로 계산합니다." : "이력 저장을 시작했습니다. ESP32가 다음 텔레메트리를 보내면 평균·최저·최고 및 지속시간이 보고서에 표시됩니다."}</p>
           </div>
+          {hasHistory && (
+            <div className="report-history-detail">
+              <div><strong>고온 구간</strong>{periodSensors.temperature?.highWindows?.length ? periodSensors.temperature.highWindows.map((item) => <span key={item.startedAt}>{formatDate(item.startedAt)} · 최고 {formatMetric(item.maxValue, "°C")} · {formatDuration(item.durationSeconds)}</span>) : <span>28°C 이상 구간 없음</span>}</div>
+              <div><strong>고습 구간</strong>{periodSensors.humidity?.highWindows?.length ? periodSensors.humidity.highWindows.map((item) => <span key={item.startedAt}>{formatDate(item.startedAt)} · 최고 {formatMetric(item.maxValue, "%")} · {formatDuration(item.durationSeconds)}</span>) : <span>75% 이상 구간 없음</span>}</div>
+              <div><strong>장비 제어 이력</strong>{reportData?.controls?.length ? reportData.controls.map((item) => <span key={item.actuator}>{actuatorName(item.actuator)} · 명령 {item.commandCount}건 · 가동 추정 {formatDuration(item.estimatedOnSeconds)}</span>) : <span>완료된 제어 명령 없음</span>}</div>
+            </div>
+          )}
         </section>
 
         <section className="report-section">
