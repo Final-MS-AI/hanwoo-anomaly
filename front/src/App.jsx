@@ -42,6 +42,8 @@ function LoginPage({ user, setUser }) {
   const location = useLocation();
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isGoogleLoggingIn, setIsGoogleLoggingIn] = useState(false);
+  const [isGuestLoggingIn, setIsGuestLoggingIn] = useState(false);
   const [adminUsername, setAdminUsername] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const isAndroidApp = hasAndroidAuthBridge();
@@ -56,7 +58,7 @@ function LoginPage({ user, setUser }) {
         }
 
         setErrorMessage("");
-        setIsLoggingIn(true);
+        setIsGoogleLoggingIn(true);
 
         const authenticatedUser = await exchangeGoogleCredential(credential);
 
@@ -71,7 +73,7 @@ function LoginPage({ user, setUser }) {
           error.message ?? "Google 로그인 정보를 처리하지 못했습니다.",
         );
       } finally {
-        setIsLoggingIn(false);
+        setIsGoogleLoggingIn(false);
       }
     },
     [navigate, setUser],
@@ -91,7 +93,7 @@ function LoginPage({ user, setUser }) {
     };
 
     const handleNativeError = (event) => {
-      setIsLoggingIn(false);
+      setIsGoogleLoggingIn(false);
       setErrorMessage(
         event.detail?.message ?? "Google 로그인에 실패했습니다.",
       );
@@ -111,13 +113,13 @@ function LoginPage({ user, setUser }) {
 
   const handleNativeGoogleLogin = () => {
     setErrorMessage("");
-    setIsLoggingIn(true);
+    setIsGoogleLoggingIn(true);
 
     try {
       window.COWOW_ANDROID.googleLogin();
     } catch (error) {
       console.error("Native Google login error:", error);
-      setIsLoggingIn(false);
+      setIsGoogleLoggingIn(false);
       setErrorMessage("앱에서 Google 로그인을 시작하지 못했습니다.");
     }
   };
@@ -125,7 +127,7 @@ function LoginPage({ user, setUser }) {
   const handleGuestLogin = async () => {
     try {
       setErrorMessage("");
-      setIsLoggingIn(true);
+      setIsGuestLoggingIn(true);
 
       const guestUser = await createGuestSession();
       setUser(guestUser);
@@ -134,7 +136,7 @@ function LoginPage({ user, setUser }) {
       console.error("Guest login error:", error);
       setErrorMessage(error.message ?? "게스트 로그인에 실패했습니다.");
     } finally {
-      setIsLoggingIn(false);
+      setIsGuestLoggingIn(false);
     }
   };
 
@@ -186,11 +188,15 @@ function LoginPage({ user, setUser }) {
                 className="native-google-login-button"
                 type="button"
                 onClick={handleNativeGoogleLogin}
-                disabled={isLoggingIn}
+                disabled={isGoogleLoggingIn}
+                aria-label="Google 로그인"
               >
-                <span>
-                  {isLoggingIn ? "Google 로그인 중" : "Google로 로그인"}
-                </span>
+                <img
+                  className="google-login-logo"
+                  src="/google-g-logo.svg"
+                  alt=""
+                />
+                <span>{isGoogleLoggingIn ? "로그인 중" : "로그인"}</span>
               </button>
             ) : GOOGLE_CLIENT_ID ? (
               <GoogleLogin
@@ -245,9 +251,9 @@ function LoginPage({ user, setUser }) {
             className="guest-login-button"
             type="button"
             onClick={handleGuestLogin}
-            disabled={isLoggingIn}
+            disabled={isGuestLoggingIn}
           >
-            {isLoggingIn ? "로그인 중..." : "게스트로 로그인"}
+            {isGuestLoggingIn ? "로그인 중..." : "게스트로 로그인"}
           </button>
         )}
 
