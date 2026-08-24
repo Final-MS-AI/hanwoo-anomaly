@@ -625,9 +625,59 @@
   .report-cattle-item { grid-template-columns: 1fr 1fr; }
 }
 
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
 @media print {
+  html, body {
+    width: auto;
+    min-height: auto;
+    margin: 0;
+    padding: 0;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
   body * { visibility: hidden; }
-  .operations-report, .operations-report * { visibility: visible; }
-  .operations-report { position: absolute; inset: 0; width: 100%; margin: 0; padding: 0; border-radius: 0; }
+
+  .operations-report-backdrop,
+  .operations-report-backdrop *,
+  .operations-report,
+  .operations-report * { visibility: visible; }
+
+  .operations-report-backdrop {
+    position: static;
+    overflow: visible;
+    padding: 0;
+    background: transparent;
+  }
+
+  .operations-report {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
   .operations-report-actions { display: none; }
+
+  .operations-report-header,
+  .report-overview,
+  .report-section,
+  .report-history-detail > div,
+  .report-cattle-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .operations-report-header { padding-bottom: 12px; }
+  .report-section { margin-top: 16px; }
+  .report-overview { margin: 14px 0; }
 }
