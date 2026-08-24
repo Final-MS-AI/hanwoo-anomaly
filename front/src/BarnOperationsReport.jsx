@@ -72,6 +72,29 @@ function actuatorName(value) {
   return { ventilation_fan: "환기 팬", water_sprayer: "살수 장치", humidifier: "가습 장치" }[value] || value;
 }
 
+function equipmentDecision(telemetry, controls = []) {
+  const samples = Number(telemetry?.sampleCount || 0);
+  if (samples < 12) {
+    return { title: "이력 수집 중", detail: `판단 기준 확보 중 · 현재 ${samples}건 수집` };
+  }
+
+  const temperature = telemetry?.temperature;
+  const humidity = telemetry?.humidity;
+  const fan = controls.find((item) => item.actuator === "ventilation_fan");
+  const fanWasUsed = Number(fan?.estimatedOnSeconds || 0) > 0;
+
+  if (Number(temperature?.max) >= 32 && fanWasUsed) {
+    return { title: "냉각 장치 검토", detail: "팬 가동 후에도 32°C 이상 고온 발생" };
+  }
+  if (Number(temperature?.max) >= 28) {
+    return { title: "환기 성능 점검", detail: "28°C 이상 고온 구간 발생" };
+  }
+  if (Number(humidity?.max) >= 75) {
+    return { title: "제습·환기 점검", detail: "75% 이상 고습 구간 발생" };
+  }
+  return { title: "추가 설비 불필요", detail: `최근 7일 ${samples}건 기준 정상 범위 유지` };
+}
+
 function printReport() {
   const report = document.querySelector(".operations-report");
   if (!report) return;
@@ -215,6 +238,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
   const reportDevice = reportData?.device;
   const deviceOnline = reportDevice?.online ?? deviceState?.online;
   const lastDeviceSeenAt = reportDevice?.lastSeenAt ?? deviceState?.lastSeenAt;
+  const facilityDecision = equipmentDecision(telemetry, reportData?.controls);
 
   return (
     <div className="operations-report-backdrop" role="dialog" aria-modal="true" aria-label="축사 운영 보고서" onClick={onClose}>
@@ -256,7 +280,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
           <div className="report-decision-grid">
             <div><span>개체 관찰</span><strong>{priorityCattle.length ? "우선 점검" : "정상 관찰"}</strong><small>{priorityCattle.length ? "이상행동 영상·현장 상태 대조" : "다음 분석 결과까지 모니터링"}</small></div>
             <div><span>환기·냉각</span><strong>{hasEnvironmentalRisk ? "운전 점검" : "현재 유지"}</strong><small>{hasEnvironmentalRisk ? "센서 추세와 팬 반응 확인" : "정상 범위 유지"}</small></div>
-            <div><span>추가 설비 판단</span><strong>이력 수집 후</strong><small>지속시간·조치 효과를 기준으로 판단</small></div>
+            <div><span>추가 설비 판단</span><strong>{facilityDecision.title}</strong><small>{facilityDecision.detail}</small></div>
           </div>
         </section>
 
