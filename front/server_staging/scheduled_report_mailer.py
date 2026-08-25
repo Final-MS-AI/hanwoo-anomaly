@@ -292,6 +292,11 @@ def record_delivery(connection, recipient, period_start, period_end):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="발송 이력과 관계없이 현재 보고 기간을 다시 발송합니다.",
+    )
     args = parser.parse_args()
     with get_connection() as connection:
         ensure_schema(connection)
@@ -304,7 +309,7 @@ def main():
             print(f"No owner with an email for {DEVICE_ID}; report not sent.")
             return
         for recipient, owner_name in owners:
-            if was_sent(connection, recipient, period_start):
+            if not args.force and was_sent(connection, recipient, period_start):
                 print(f"Already sent to {recipient} for {period_start}.")
                 continue
             if args.dry_run:
