@@ -398,6 +398,61 @@ function DemoVideoSelector({ onInferenceComplete }) {
               </div>
             </div>
 
+            {jobStatus === "completed" &&
+              selectedVideo.inferenceSummary && (
+                <div className="behavior-summary">
+                  <div className="behavior-summary-header">
+                    <span>행동 분석 결과</span>
+                    <strong>
+                      {
+                        selectedVideo.inferenceSummary
+                          .processed_frames
+                      }
+                      프레임 분석
+                    </strong>
+                  </div>
+
+                  <div className="behavior-summary-grid">
+                    <div className="behavior-summary-item">
+                      <span>섭식</span>
+                      <strong>
+                        {selectedVideo.inferenceSummary
+                          .behavior_counts?.feeding ?? 0}
+                      </strong>
+                    </div>
+
+                    <div className="behavior-summary-item">
+                      <span>누움</span>
+                      <strong>
+                        {selectedVideo.inferenceSummary
+                          .behavior_counts?.lying ?? 0}
+                      </strong>
+                    </div>
+
+                    <div className="behavior-summary-item">
+                      <span>기립</span>
+                      <strong>
+                        {selectedVideo.inferenceSummary
+                          .behavior_counts?.standing ?? 0}
+                      </strong>
+                    </div>
+
+                    <div className="behavior-summary-item">
+                      <span>보행</span>
+                      <strong>
+                        {selectedVideo.inferenceSummary
+                          .behavior_counts?.walking ?? 0}
+                      </strong>
+                    </div>
+                  </div>
+
+                  <p className="behavior-summary-note">
+                    각 수치는 분석 프레임에서 Track ID별로
+                    판정된 행동 라벨의 누적 횟수입니다.
+                  </p>
+                </div>
+              )}
+
             {detectedCattle.length > 0 && (
               <div className="detected-cattle-list">
                 <div className="detected-cattle-header">

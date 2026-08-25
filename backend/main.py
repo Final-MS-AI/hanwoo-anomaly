@@ -20,6 +20,13 @@ from exclusive_device_api import router as exclusive_device_router
 from device_disconnect_api import router as device_disconnect_router
 from auth_session import create_session_cookie, router as auth_session_router
 from feedback_api import router as feedback_router
+from admin_feedback_api import router as admin_feedback_router
+from dashboard_api import router as dashboard_router
+from operations_report_api import router as operations_report_router
+from report_recipient_api import router as report_recipient_router
+from admin_auth import router as admin_auth_router
+from admin_login import router as admin_login_router
+from admin_notifications import router as admin_notifications_router
 
 # ---------------------------------------------------------
 # 환경변수 로딩
@@ -96,6 +103,13 @@ app.include_router(exclusive_device_router)
 app.include_router(device_disconnect_router)
 app.include_router(auth_session_router)
 app.include_router(feedback_router)
+app.include_router(admin_feedback_router)
+app.include_router(dashboard_router)
+app.include_router(operations_report_router)
+app.include_router(report_recipient_router)
+app.include_router(admin_auth_router)
+app.include_router(admin_login_router)
+app.include_router(admin_notifications_router)
 
 
 # ---------------------------------------------------------
@@ -670,12 +684,9 @@ async def kakao_callback(
     return response
 
 
-@app.get("/anomalies/active")
-def get_active_anomalies():
-    return {
-        "data": [],
-        "count": 0
-    }
+from anomaly_event_api import router as anomaly_event_router
+
+app.include_router(anomaly_event_router)
 
 from google_auth import router as google_auth_router
 from guest_auth import router as guest_auth_router

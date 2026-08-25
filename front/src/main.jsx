@@ -7,7 +7,11 @@ import App from "./App.jsx";
 import "./index.css";
 import "./app-mobile.css";
 
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+// OAuth Client ID is public browser configuration. Keep a fallback so an
+// accidentally omitted production .env file cannot remove the Google button.
+const googleClientId =
+  import.meta.env.VITE_GOOGLE_CLIENT_ID ??
+  "303459689220-bkuu4frgrdkil3mcp8632th1j105kkv5.apps.googleusercontent.com";
 
 const app = (
   <BrowserRouter>

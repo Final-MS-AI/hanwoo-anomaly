@@ -238,12 +238,9 @@ def claim_exclusive_device(
                         detail="게스트 장비 번호와 등록 코드는 guest입니다.",
                     )
 
-                if owner:
-                    raise HTTPException(
-                        status_code=409,
-                        detail="현재 다른 사용자가 사용 중인 장비입니다.",
-                    )
-
+                # The guest flow is a shared demonstration session.  It never
+                # creates an owner row, so it must not be blocked by a real
+                # account currently owning the physical device.
                 return {
                     "device": {
                         "deviceId": PHYSICAL_DEVICE_ID,
