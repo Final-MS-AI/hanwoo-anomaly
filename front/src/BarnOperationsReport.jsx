@@ -147,7 +147,22 @@ function printReport() {
   printWindow.document.close();
 }
 
-function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
+const GUEST_REPORT_DATA = {
+  deviceId: "GUEST-DEMO-01",
+  device: { online: true, lastSeenAt: new Date().toISOString() },
+  telemetry: {
+    sampleCount: 96,
+    temperature: { average: 26.4, min: 24.8, max: 29.1, highWindows: [] },
+    humidity: { average: 67, min: 59, max: 73, highWindows: [] },
+    airQuality: { average: 18, min: 11, max: 31, highWindows: [] },
+  },
+  controls: [
+    { actuator: "ventilation_fan", commandCount: 8, estimatedOnSeconds: 14400 },
+    { actuator: "water_sprayer", commandCount: 2, estimatedOnSeconds: 60 },
+  ],
+};
+
+function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest = false }) {
   const [deviceState, setDeviceState] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -155,6 +170,18 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
 
   useEffect(() => {
     if (!open) return undefined;
+    if (isGuest) {
+      setDeviceState({
+        online: true,
+        lastSeenAt: new Date().toISOString(),
+        publicDeviceNumber: "GUEST",
+        sensors: { temperature: 26.4, humidity: 67, airQuality: 18 },
+      });
+      setReportData(GUEST_REPORT_DATA);
+      setLoadError("");
+      setReportLoadError("");
+      return undefined;
+    }
     const controller = new AbortController();
 
     async function loadDeviceState() {
@@ -199,7 +226,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt }) {
       window.clearInterval(refreshTimer);
       controller.abort();
     };
-  }, [open]);
+  }, [open, isGuest]);
 
   const closeReport = (event) => {
     event?.preventDefault();

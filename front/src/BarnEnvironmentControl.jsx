@@ -72,8 +72,9 @@ function getSensorLevel(value, sensor) {
   return "normal";
 }
 
-function BarnEnvironmentControl() {
+function BarnEnvironmentControl({ user }) {
   const navigate = useNavigate();
+  const isGuest = user?.loginType === "guest";
   const [device, setDevice] = useState(() => {
     try {
       // Browser storage is shared across Google/Kakao/Naver logins. Only the
@@ -121,6 +122,14 @@ function BarnEnvironmentControl() {
     : "확인 중";
 
   useEffect(() => {
+    if (isGuest) {
+      setDevice({ deviceId: "GUEST-DEMO-01", publicDeviceNumber: "GUEST", accountScope: "guest" });
+      setSensors({ temperature: 26.4, humidity: 67, airQuality: 18 });
+      setIsDeviceOnline(true);
+      setLastSeenAt(new Date().toISOString());
+      setControlMessage("게스트 데모 환경 시스템이 연결되었습니다.");
+      return undefined;
+    }
     if (!CONTROL_API_URL) return undefined;
 
     const controller = new AbortController();
@@ -153,9 +162,10 @@ function BarnEnvironmentControl() {
       });
 
     return () => controller.abort();
-  }, []);
+  }, [isGuest]);
 
   useEffect(() => {
+    if (isGuest) return undefined;
     if (!device?.deviceId || !CONTROL_API_URL) {
       return undefined;
     }
@@ -204,9 +214,13 @@ function BarnEnvironmentControl() {
       window.clearInterval(sensorTimer);
       if (sprayTimerRef.current) window.clearTimeout(sprayTimerRef.current);
     };
-  }, [device?.deviceId]);
+  }, [device?.deviceId, isGuest]);
 
   const sendControlCommand = useCallback(async (actuator, value) => {
+    if (isGuest) {
+      setControlMessage(`${actuator === "ventilation_fan" ? "환기팬" : "살수 장치"} 데모 명령을 적용했습니다.`);
+      return;
+    }
     if (!CONTROL_API_URL) return;
 
     const response = await fetch(`${CONTROL_API_URL}/actuators`, {
@@ -221,7 +235,7 @@ function BarnEnvironmentControl() {
     });
 
     if (!response.ok) throw new Error("장비 제어 명령 전송에 실패했습니다.");
-  }, [device?.deviceId]);
+  }, [device?.deviceId, isGuest]);
 
   useEffect(() => {
     if (mode !== "auto" || !device?.deviceId) return undefined;

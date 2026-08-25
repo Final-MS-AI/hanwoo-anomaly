@@ -42,7 +42,7 @@ function formatUpdatedAt(value) {
   }).format(date);
 }
 
-function AbnormalCattleDashboard() {
+function AbnormalCattleDashboard({ user }) {
   const [filter, setFilter] = useState("all");
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [cattleSummary, setCattleSummary] = useState(EMPTY_SUMMARY);
@@ -337,6 +337,7 @@ function AbnormalCattleDashboard() {
         onClose={() => setIsReportOpen(false)}
         cattle={abnormalCattle}
         updatedAt={updatedAt}
+        isGuest={user?.loginType === "guest"}
       />
     </section>
   );

@@ -943,7 +943,7 @@ function DashboardPage({ user, setUser }) {
         </div>
       </header>
 
-      {location.pathname === "/dashboard" && <AbnormalCattleDashboard />}
+      {location.pathname === "/dashboard" && <AbnormalCattleDashboard user={user} />}
       {location.pathname === "/inference" && (
         <div
           style={{
@@ -988,7 +988,7 @@ function DashboardPage({ user, setUser }) {
 
       {location.pathname === "/chat" && <RagChatbot />}
 
-      {location.pathname === "/control" && <BarnEnvironmentControl />}
+      {location.pathname === "/control" && <BarnEnvironmentControl user={user} />}
 
       {location.pathname === "/devices/setup" && <DeviceSetupPage user={user} />}
 
