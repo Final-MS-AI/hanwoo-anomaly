@@ -144,11 +144,11 @@ def require_access(connection, user, device_id):
     role = role_for(connection, user["id"], device_id)
     if role:
         return role
+    # Guest mode is a shared, read/control demo of the same device.  It has no
+    # ownership or family-member record and remains available while a social
+    # account is connected to the physical device.
     if user["provider"] == "guest":
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT 1 FROM device_owners WHERE device_id=%s", (device_id,))
-            if not cursor.fetchone():
-                return "guest"
+        return "guest"
     raise HTTPException(status_code=403, detail="이 장비에 접근할 권한이 없습니다.")
 
 
@@ -324,10 +324,7 @@ def my_devices(cowow_session: str | None = Cookie(default=None)):
     with get_connection() as connection:
         role = role_for(connection, user["id"])
         if not role and user["provider"] == "guest":
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT 1 FROM device_owners WHERE device_id=%s", (PHYSICAL_DEVICE_ID,))
-                if not cursor.fetchone():
-                    role = "guest"
+            role = "guest"
         if not role:
             return {"devices": []}
         with connection.cursor() as cursor:
