@@ -9,6 +9,7 @@ import argparse
 import html
 import os
 import smtplib
+import textwrap
 from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 
@@ -146,6 +147,84 @@ def report_html(owner_name, report):
     </body></html>"""
 
 
+def _pdf_text(value):
+    """Encode Korean text for a built-in Korean CID font PDF string."""
+    return str(value).encode("utf-16-be").hex().upper()
+
+
+def _pdf_lines(owner_name, report):
+    lines = [
+        "COWOW 축사 운영 보고서",
+        f"수신자: {owner_name or '구성원'}",
+        f"보고 기간: {report['start'].astimezone().strftime('%Y-%m-%d')} ~ {report['end'].astimezone().strftime('%Y-%m-%d')}",
+        f"센서 수집 건수: {report['sample_count']}건",
+        "",
+        "[환경 센서 요약]",
+        f"온도  평균 {metric(report['temperature']['average'], '°C')} / 최저 {metric(report['temperature']['min'], '°C')} / 최고 {metric(report['temperature']['max'], '°C')}",
+        f"습도  평균 {metric(report['humidity']['average'], '%')} / 최저 {metric(report['humidity']['min'], '%')} / 최고 {metric(report['humidity']['max'], '%')}",
+        f"공기질 평균 {metric(report['air_quality']['average'], '%')} / 최저 {metric(report['air_quality']['min'], '%')} / 최고 {metric(report['air_quality']['max'], '%')}",
+        "",
+        "[장비 제어 이력]",
+    ]
+    controls = report["controls"] or []
+    lines.extend(
+        f"- {item['actuator']}: 명령 {item['commandCount']}건, 가동 추정 {duration(item['estimatedOnSeconds'])}"
+        for item in controls
+    )
+    if not controls:
+        lines.append("- 완료된 제어 명령이 없습니다.")
+    lines.extend(["", "[이상행동 기록]"])
+    anomalies = report["anomalies"] or []
+    lines.extend(
+        f"- {cattle_id} · {behavior} · {status} · {count}건"
+        for cattle_id, behavior, status, count, _ in anomalies
+    )
+    if not anomalies:
+        lines.append("- 기간 내 확인이 필요한 이상행동 기록이 없습니다.")
+    lines.extend(["", f"상세 확인: {FRONTEND_URL}/dashboard"])
+    return [part for line in lines for part in (textwrap.wrap(line, width=62) or [""])]
+
+
+def report_pdf(owner_name, report):
+    """Generate a compact, dependency-free A4 PDF attachment with Korean text."""
+    lines = _pdf_lines(owner_name, report)
+    per_page = 38
+    pages = [lines[index:index + per_page] for index in range(0, len(lines), per_page)] or [[""]]
+    objects = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        None,
+        b"<< /Type /Font /Subtype /Type0 /BaseFont /HYSMyeongJo-Medium /Encoding /UniKS-UTF16-H /DescendantFonts [4 0 R] >>",
+        b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HYSMyeongJo-Medium /CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> >>",
+    ]
+    page_ids = []
+    for page_lines in pages:
+        page_id = len(objects) + 1
+        content_id = page_id + 1
+        page_ids.append(page_id)
+        commands = ["BT", "/F1 17 Tf", "50 800 Td"]
+        for index, line in enumerate(page_lines):
+            if index:
+                commands.append("0 -20 Td")
+            commands.append(f"<{_pdf_text(line)}> Tj")
+        commands.append("ET")
+        content = "\n".join(commands).encode("ascii")
+        objects.append(f"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents {content_id} 0 R >>".encode("ascii"))
+        objects.append(b"<< /Length " + str(len(content)).encode("ascii") + b" >>\nstream\n" + content + b"\nendstream")
+    objects[1] = ("<< /Type /Pages /Count %d /Kids [%s] >>" % (len(page_ids), " ".join(f"{page_id} 0 R" for page_id in page_ids))).encode("ascii")
+    output = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+    offsets = [0]
+    for index, value in enumerate(objects, 1):
+        offsets.append(len(output))
+        output.extend(f"{index} 0 obj\n".encode("ascii"))
+        output.extend(value)
+        output.extend(b"\nendobj\n")
+    xref = len(output)
+    output.extend(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("ascii"))
+    output.extend(b"".join(f"{offset:010d} 00000 n \n".encode("ascii") for offset in offsets[1:]))
+    output.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii"))
+    return bytes(output)
+
+
 def send_report(recipient, owner_name, report):
     username = os.getenv("SMTP_USERNAME")
     password = os.getenv("SMTP_PASSWORD")
@@ -157,6 +236,12 @@ def send_report(recipient, owner_name, report):
     message["To"] = recipient
     message.set_content(f"COWOW 최근 {REPORT_DAYS}일 축사 운영 보고서입니다. 웹에서 상세 내용을 확인하세요: {FRONTEND_URL}/dashboard")
     message.add_alternative(report_html(owner_name, report), subtype="html")
+    message.add_attachment(
+        report_pdf(owner_name, report),
+        maintype="application",
+        subtype="pdf",
+        filename=f"COWOW_축사운영보고서_{report['end'].strftime('%Y%m%d')}.pdf",
+    )
     with smtplib.SMTP(os.getenv("SMTP_HOST", "smtp.gmail.com"), int(os.getenv("SMTP_PORT", "587")), timeout=30) as smtp:
         smtp.ehlo()
         smtp.starttls()
@@ -169,12 +254,18 @@ def recipients(connection, device_id):
     with connection.cursor() as cursor:
         cursor.execute(
             """
-            SELECT u.email, COALESCE(NULLIF(u.name, ''), '관리자')
-            FROM device_owners o
-            JOIN users u ON u.id = o.user_id
-            WHERE o.device_id = %s AND u.email IS NOT NULL AND u.email <> ''
+            WITH connected_users AS (
+                SELECT user_id FROM device_owners WHERE device_id = %s
+                UNION
+                SELECT user_id FROM device_members WHERE device_id = %s
+            )
+            SELECT COALESCE(NULLIF(r.email, ''), u.email), COALESCE(NULLIF(u.name, ''), '구성원')
+            FROM connected_users cu
+            JOIN users u ON u.id = cu.user_id
+            LEFT JOIN user_report_recipients r ON r.user_id = u.id AND r.verified_at IS NOT NULL
+            WHERE COALESCE(NULLIF(r.email, ''), NULLIF(u.email, '')) IS NOT NULL
             """,
-            (device_id,),
+            (device_id, device_id),
         )
         return cursor.fetchall()
 
