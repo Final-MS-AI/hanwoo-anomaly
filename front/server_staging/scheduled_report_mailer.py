@@ -250,7 +250,7 @@ def report_pdf_html(owner_name, report):
     * {{ box-sizing: border-box; }} body {{ font-family: Cowow, sans-serif; color:#30251d; font-size:10px; line-height:1.5; }}
     header {{ border-bottom:1px solid #d9cbb9; padding-bottom:13px; }} .eyebrow {{ color:#287343; font-size:11px; font-weight:700; }}
     h1 {{ font-size:23px; margin:5px 0 4px; }} .sub {{ color:#806f60; margin:0; }} .period {{ float:right; color:#806f60; font-size:9px; margin-top:-16px; }}
-    table {{ border-spacing:0; width:100%; }} .cards {{ margin-top:14px; border-spacing:8px 0; margin-left:-8px; width:calc(100% + 16px); }}
+    table {{ border-spacing:0; width:100%; }} .cards {{ margin-top:14px; border-spacing:8px 0; width:100%; }}
     .metric-card {{ width:25%; padding:12px; border:1px solid #e3d7c8; border-radius:10px; vertical-align:top; }} .metric-card .label {{ color:#806f60; }}
     .metric-card strong {{ display:block; font-size:16px; margin-top:4px; }} .metric-card small {{ display:block; color:#897b70; margin-top:3px; }}
     section {{ margin-top:13px; border:1px solid #d5e6d7; border-radius:12px; padding:14px; break-inside:avoid; }} section.sensor {{ border-color:#e7d7c3; }}
