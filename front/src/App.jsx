@@ -958,7 +958,10 @@ function DashboardPage({ user, setUser }) {
         >
           <div style={{ fontSize: "1.35rem", fontWeight: 700, marginBottom: "16px" }}>급이대 구역 지정하기</div>
           <iframe
-            src="/zone-setup.html"
+            // Keep this as a separately served static tool. The version query
+            // prevents a previously cached SPA fallback from being rendered
+            // inside the guest zone tab as a second COWOW screen.
+            src="/zone-setup.html?v=20260825-guest-zone"
             title="급이대 구역 지정"
             scrolling="no"
             onLoad={(ev) => {
