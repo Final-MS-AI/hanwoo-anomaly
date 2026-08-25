@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API_BASE_URL =
@@ -30,6 +30,10 @@ function DeviceSetupPage({ user }) {
   const [shareCode, setShareCode] = useState("");
   const [barnName, setBarnName] = useState("1번 축사");
   const [isSendingCode, setIsSendingCode] = useState(false);
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [recipientCode, setRecipientCode] = useState("");
+  const [isRecipientVerified, setIsRecipientVerified] = useState(false);
+  const [isSendingRecipientCode, setIsSendingRecipientCode] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [messageType, setMessageType] = useState("error");
@@ -37,6 +41,20 @@ function DeviceSetupPage({ user }) {
   const normalizedDeviceNumber = isGuest
     ? "guest"
     : deviceNumber.trim().toUpperCase();
+  const needsRecipientEmail = user?.loginType === "kakao" && !user?.email;
+
+  useEffect(() => {
+    if (!needsRecipientEmail) return;
+    fetch(`${API_BASE_URL}/api/reports/recipient`, { credentials: "include" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (data.recipientEmail) {
+          setRecipientEmail(data.recipientEmail);
+          setIsRecipientVerified(true);
+        }
+      })
+      .catch(() => {});
+  }, [needsRecipientEmail]);
 
   const validateDeviceNumber = () => {
     if (
@@ -58,9 +76,9 @@ function DeviceSetupPage({ user }) {
       return;
     }
 
-    if (!user?.email) {
+    if (!user?.email && !isRecipientVerified) {
       setMessageType("error");
-      setMessage("로그인 계정의 이메일 정보를 확인할 수 없습니다. 다시 로그인해 주세요.");
+      setMessage("카카오 계정은 아래에서 보고서 수신 이메일을 먼저 인증해 주세요.");
       return;
     }
 
@@ -107,6 +125,50 @@ function DeviceSetupPage({ user }) {
     } finally {
       window.clearTimeout(timeoutId);
       setIsSendingCode(false);
+    }
+  };
+
+  const sendRecipientCode = async () => {
+    if (!recipientEmail.trim()) return;
+    setIsSendingRecipientCode(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/reports/recipient/send-code`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: recipientEmail.trim() }),
+      });
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.detail ?? "인증 코드 발송에 실패했습니다.");
+      setMessageType("success");
+      setMessage("입력한 이메일로 인증 코드를 보냈습니다.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.message);
+    } finally {
+      setIsSendingRecipientCode(false);
+    }
+  };
+
+  const verifyRecipientEmail = async () => {
+    if (!recipientCode.trim()) return;
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/reports/recipient/verify`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: recipientCode.trim() }),
+      });
+      const data = await readApiResponse(response);
+      if (!response.ok) throw new Error(data.detail ?? "이메일 인증에 실패했습니다.");
+      setRecipientEmail(data.recipientEmail);
+      setIsRecipientVerified(true);
+      setMessageType("success");
+      setMessage("수신 이메일 인증이 완료되었습니다. 이제 등록 코드를 받을 수 있습니다.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error.message);
     }
   };
 
@@ -337,6 +399,22 @@ function DeviceSetupPage({ user }) {
             </button>
           )}
         </div>
+
+        {needsRecipientEmail && (
+          <div className="device-recipient-email-card">
+            <strong>카카오 보고서·등록 코드 수신 이메일</strong>
+            <p>카카오 계정 이메일 대신 받을 주소를 입력하고 인증하세요.</p>
+            <div>
+              <input type="email" value={recipientEmail} placeholder="example@hanmail.net" onChange={(event) => { setRecipientEmail(event.target.value); setIsRecipientVerified(false); }} />
+              <button type="button" onClick={sendRecipientCode} disabled={isSendingRecipientCode || !recipientEmail.trim()}>{isSendingRecipientCode ? "발송 중..." : "인증 코드 받기"}</button>
+            </div>
+            <div>
+              <input value={recipientCode} inputMode="numeric" placeholder="6자리 인증 코드" onChange={(event) => setRecipientCode(event.target.value)} />
+              <button type="button" onClick={verifyRecipientEmail} disabled={!recipientCode.trim()}>이메일 인증</button>
+            </div>
+            {isRecipientVerified && <small>인증 완료 · {recipientEmail}</small>}
+          </div>
+        )}
 
         <label>
           <span>일회용 등록 코드</span>

@@ -670,6 +670,21 @@ h1 {
   background: #f7eee5;
 }
 
+.device-recipient-email-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #d8e7db;
+  border-radius: 12px;
+  background: #f5faf6;
+}
+
+.device-recipient-email-card p,
+.device-recipient-email-card small { margin: 0; color: #69766d; font-size: 12px; }
+.device-recipient-email-card > div { display: flex; gap: 8px; }
+.device-recipient-email-card input { min-width: 0; flex: 1; }
+.device-recipient-email-card button { white-space: nowrap; }
+
 .header-actions-right {
   margin-left: auto;
 }
