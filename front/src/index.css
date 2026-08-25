@@ -14,6 +14,10 @@ body {
   min-height: 100vh;
   font-family:
     Inter, Pretendard, "Noto Sans KR", Arial, sans-serif;
+  /* Improve text legibility without scaling cards, charts, or navigation. */
+  font-size-adjust: 0.6;
+  -webkit-text-size-adjust: 112%;
+  text-size-adjust: 112%;
   background:
     linear-gradient(145deg, #f4ead8 0%, #fffaf0 50%, #e8d5b5 100%);
   color: #30251e;
@@ -1720,3 +1724,79 @@ h1 {
   line-height: 1.5;
 }
 .admin-login-divider{display:flex;align-items:center;gap:10px;margin:20px 0 12px;color:#9a8d80;font-size:11px}.admin-login-divider:before,.admin-login-divider:after{content:"";height:1px;flex:1;background:#e7ded5}.admin-login-form{display:grid;gap:8px;margin-top:28px}.admin-login-form input{width:100%;padding:11px 12px;border:1px solid #ded3c8;border-radius:8px;background:#fffaf5;font-size:13px;outline:none}.admin-login-form input:focus{border-color:#7e9a82;box-shadow:0 0 0 3px #7e9a821a}.admin-login-form button{width:100%;padding:11px 14px;border:0;border-radius:8px;background:#314f3a;color:#fff;font-size:13px;font-weight:700;cursor:pointer}.admin-login-form button:disabled{opacity:.6;cursor:wait}
+
+/* ===== Behavior inference summary ===== */
+
+.behavior-summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  background: #faf7f2;
+  border-radius: 14px;
+}
+
+.behavior-summary-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.behavior-summary-header span {
+  color: #7a6958;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.behavior-summary-header strong {
+  color: #3e3026;
+  font-size: 14px;
+}
+
+.behavior-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.behavior-summary-item {
+  display: grid;
+  gap: 7px;
+  padding: 13px 10px;
+  background: #ffffff;
+  border: 1px solid #ebe3da;
+  border-radius: 11px;
+  text-align: center;
+}
+
+.behavior-summary-item span {
+  color: #7a6958;
+  font-size: 12px;
+}
+
+.behavior-summary-item strong {
+  color: #38291f;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.behavior-summary-note {
+  margin: 0;
+  color: #857568;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .behavior-summary {
+    padding: 14px;
+  }
+
+  .behavior-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .behavior-summary-item strong {
+    font-size: 20px;
+  }
+}

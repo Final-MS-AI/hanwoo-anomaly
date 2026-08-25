@@ -22,6 +22,8 @@ from auth_session import create_session_cookie, router as auth_session_router
 from feedback_api import router as feedback_router
 from admin_feedback_api import router as admin_feedback_router
 from dashboard_api import router as dashboard_router
+from operations_report_api import router as operations_report_router
+from report_recipient_api import router as report_recipient_router
 from admin_auth import router as admin_auth_router
 from admin_login import router as admin_login_router
 from admin_notifications import router as admin_notifications_router
@@ -103,6 +105,8 @@ app.include_router(auth_session_router)
 app.include_router(feedback_router)
 app.include_router(admin_feedback_router)
 app.include_router(dashboard_router)
+app.include_router(operations_report_router)
+app.include_router(report_recipient_router)
 app.include_router(admin_auth_router)
 app.include_router(admin_login_router)
 app.include_router(admin_notifications_router)

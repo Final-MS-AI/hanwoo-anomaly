@@ -13,8 +13,10 @@ const USER_DATA_DETAIL_CACHE_KEY = "cowow-admin-user-data-details";
 const USER_DATA_SELECTION_KEY = "cowow-admin-user-data-selection";
 const USER_IDENTITY_CACHE_KEY = "cowow-admin-identity-owners";
 const USER_SCOPE_SELECTION_KEY = "cowow-admin-user-scope";
+const AI_FEEDBACK_CACHE_KEY_PREFIX = "cowow-admin-ai-feedback";
 const USER_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 const trackDetailCache = new Map();
+const aiFeedbackRequests = new Map();
 let adminDataPreloadPromise = null;
 
 function readSessionCache(key, fallback) {
@@ -33,6 +35,33 @@ function readFreshSessionCache(key, fallback) {
 
 function writeFreshSessionCache(key, value) {
   window.sessionStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), value }));
+}
+
+function aiFeedbackCacheKey(status) {
+  return `${AI_FEEDBACK_CACHE_KEY_PREFIX}:${status}`;
+}
+
+function loadAiFeedbackData(status, { force = false } = {}) {
+  const cacheKey = aiFeedbackCacheKey(status);
+  const cached = readFreshSessionCache(cacheKey, null);
+  if (!force && cached !== null) return Promise.resolve(cached);
+  if (!force && aiFeedbackRequests.has(status)) return aiFeedbackRequests.get(status);
+
+  const request = fetch(
+    `${ADMIN_API}/admin/feedback?status=${encodeURIComponent(status)}&limit=100`,
+    { credentials: "include" },
+  )
+    .then(async (response) => {
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
+      const feedback = payload.feedback || [];
+      writeFreshSessionCache(cacheKey, feedback);
+      return feedback;
+    })
+    .finally(() => aiFeedbackRequests.delete(status));
+
+  aiFeedbackRequests.set(status, request);
+  return request;
 }
 
 function useIdentityOwners() {
@@ -125,7 +154,13 @@ function preloadAdminWorkspaceData() {
       await Promise.all(Array.from({ length: Math.min(3, pendingIds.length) }, worker));
     };
 
-    await Promise.allSettled([preloadIdentityOwners(), preloadBindings(), preloadMembers(), preloadUsers()]);
+    await Promise.allSettled([
+      preloadIdentityOwners(),
+      preloadBindings(),
+      preloadMembers(),
+      preloadUsers(),
+      loadAiFeedbackData("pending"),
+    ]);
   })().finally(() => { adminDataPreloadPromise = null; });
   return adminDataPreloadPromise;
 }
@@ -409,23 +444,26 @@ function FeedbackWorkspace({ filteredFeedback, filter, setFilter, reviewItem, on
 
 function AiFeedbackWorkspace() {
   const [status, setStatus] = useState("pending");
-  const [items, setItems] = useState([]);
+  const initialItems = readFreshSessionCache(aiFeedbackCacheKey("pending"), null);
+  const [items, setItems] = useState(initialItems || []);
   const [notes, setNotes] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(initialItems === null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  const loadFeedback = async (nextStatus = status) => {
+  const loadFeedback = async (nextStatus = status, { force = false } = {}) => {
+    const cached = readFreshSessionCache(aiFeedbackCacheKey(nextStatus), null);
+    if (!force && cached !== null) {
+      setItems(cached);
+      setLoading(false);
+      setError("");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
-      const response = await fetch(
-        `${ADMIN_API}/admin/feedback?status=${encodeURIComponent(nextStatus)}&limit=100`,
-        { credentials: "include" },
-      );
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
-      setItems(payload.feedback || []);
+      setItems(await loadAiFeedbackData(nextStatus, { force }));
     } catch (err) {
       setItems([]);
       setError(`AI 피드백을 불러오지 못했습니다: ${err.message}`);
@@ -463,7 +501,7 @@ function AiFeedbackWorkspace() {
           : "AI 피드백을 반려했습니다.",
       );
 
-      await loadFeedback(status);
+      await loadFeedback(status, { force: true });
     } catch (err) {
       setError(`검토 처리에 실패했습니다: ${err.message}`);
     }

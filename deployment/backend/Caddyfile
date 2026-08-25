@@ -65,6 +65,12 @@ hanwoo.koreacentral.cloudapp.azure.com {
 	handle /rag/* {
 		reverse_proxy 127.0.0.1:8000
 	}
+
+	# 운영 리포트 API는 SPA fallback보다 먼저 백엔드로 전달한다.
+	handle /api/reports/* {
+		reverse_proxy 127.0.0.1:8000
+	}
+
 	handle /api/dashboard {
 	reverse_proxy 127.0.0.1:8000
 }
