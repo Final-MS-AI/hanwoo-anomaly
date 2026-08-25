@@ -8,6 +8,7 @@ import os
 
 import psycopg
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Query
+from psycopg.rows import dict_row
 
 from auth_session import COOKIE_NAME, read_user_id
 from admin_notification_store import create_admin_notification
@@ -71,6 +72,168 @@ def list_admin_users(admin=Depends(require_admin)):
         "can_revoke": admin["provider"] == "admin",
         "users": [{"id": r[0], "name": r[1], "email": r[2], "provider": r[3], "granted_at": r[4]} for r in rows],
     }
+
+
+@router.get("/data/users")
+def list_data_users(
+    q: str | None = Query(default=None, max_length=100),
+    limit: int = Query(default=100, ge=1, le=200),
+    admin=Depends(require_admin),
+):
+    """List application users with developer-facing data totals."""
+    database_url = os.getenv("DATABASE_URL")
+    normalized = q.strip().lower() if q and q.strip() else None
+    pattern = f"%{normalized}%" if normalized else None
+    search_clause = ""
+    parameters: tuple = (limit,)
+    if normalized:
+        search_clause = """WHERE (LOWER(COALESCE(u.name, '')) LIKE %s
+                              OR LOWER(COALESCE(u.email, '')) LIKE %s
+                              OR u.id::text = %s)"""
+        parameters = (pattern, pattern, normalized, limit)
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        rows = connection.execute(
+            f"""
+            WITH cattle_totals AS (
+                SELECT user_id, COUNT(*) AS cattle_count
+                  FROM public.cattle GROUP BY user_id
+            ), device_totals AS (
+                SELECT user_id, COUNT(DISTINCT device_id) AS device_count
+                  FROM (
+                      SELECT user_id, device_id FROM public.device_owners
+                      UNION ALL
+                      SELECT user_id, device_id FROM public.device_members
+                  ) linked GROUP BY user_id
+            ), feedback_totals AS (
+                SELECT user_id, COUNT(*) AS feedback_count
+                  FROM public.model_feedback GROUP BY user_id
+            ), anomaly_totals AS (
+                SELECT c.user_id, COUNT(*) AS anomaly_count
+                  FROM public.anomaly_events ae
+                  JOIN public.cattle c ON c.id=ae.cattle_id
+                 GROUP BY c.user_id
+            )
+            SELECT u.id, u.name, u.email, u.provider, u.created_at,
+                   (a.user_id IS NOT NULL) AS is_admin,
+                   COALESCE(ct.cattle_count, 0) AS cattle_count,
+                   COALESCE(dt.device_count, 0) AS device_count,
+                   COALESCE(ft.feedback_count, 0) AS feedback_count,
+                   COALESCE(at.anomaly_count, 0) AS anomaly_count
+              FROM public.users u
+              LEFT JOIN public.admin_users a ON a.user_id=u.id
+              LEFT JOIN cattle_totals ct ON ct.user_id=u.id
+              LEFT JOIN device_totals dt ON dt.user_id=u.id
+              LEFT JOIN feedback_totals ft ON ft.user_id=u.id
+              LEFT JOIN anomaly_totals at ON at.user_id=u.id
+              {search_clause}
+             ORDER BY u.created_at DESC, u.id DESC
+             LIMIT %s
+            """,
+            parameters,
+        ).fetchall()
+    return {"users": [dict(row) for row in rows], "count": len(rows)}
+
+
+@router.get("/data/users/{user_id}")
+def get_data_user(user_id: int, admin=Depends(require_admin)):
+    """Return cattle, devices, feedback and anomaly data for one user."""
+    database_url = os.getenv("DATABASE_URL")
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        row = connection.execute(
+            """
+            SELECT jsonb_build_object(
+                'user', jsonb_build_object(
+                    'id', u.id, 'name', u.name, 'email', u.email,
+                    'provider', u.provider, 'created_at', u.created_at,
+                    'is_admin', EXISTS (
+                        SELECT 1 FROM public.admin_users a WHERE a.user_id=u.id
+                    )
+                ),
+                'summary', jsonb_build_object(
+                    'cattle', (SELECT COUNT(*) FROM public.cattle c WHERE c.user_id=u.id),
+                    'devices', (SELECT COUNT(DISTINCT device_id) FROM (
+                        SELECT o.device_id FROM public.device_owners o WHERE o.user_id=u.id
+                        UNION ALL
+                        SELECT m.device_id FROM public.device_members m WHERE m.user_id=u.id
+                    ) linked),
+                    'feedback', (SELECT COUNT(*) FROM public.model_feedback f WHERE f.user_id=u.id),
+                    'anomalies', (SELECT COUNT(*) FROM public.anomaly_events ae
+                        JOIN public.cattle c ON c.id=ae.cattle_id WHERE c.user_id=u.id),
+                    'active_anomalies', (SELECT COUNT(*) FROM public.anomaly_events ae
+                        JOIN public.cattle c ON c.id=ae.cattle_id
+                        WHERE c.user_id=u.id AND ae.is_active)
+                ),
+                'cattle', COALESCE((SELECT jsonb_agg(to_jsonb(items) ORDER BY items.created_at DESC)
+                    FROM (SELECT c.id, c.national_id, c.ear_tag_number, c.barn_id,
+                                 c.status, c.created_at, COUNT(ae.id) AS anomaly_count,
+                                 COUNT(ae.id) FILTER (WHERE ae.is_active) AS active_anomaly_count,
+                                 MAX(ae.detected_at) AS last_anomaly_at
+                            FROM public.cattle c
+                            LEFT JOIN public.anomaly_events ae ON ae.cattle_id=c.id
+                           WHERE c.user_id=u.id GROUP BY c.id) items), '[]'::jsonb),
+                'devices', COALESCE((SELECT jsonb_agg(to_jsonb(items) ORDER BY items.connected_at DESC)
+                    FROM (SELECT o.device_id, 'owner'::text AS role, o.registered_at AS connected_at
+                            FROM public.device_owners o WHERE o.user_id=u.id
+                          UNION ALL
+                          SELECT m.device_id, 'member'::text AS role, m.joined_at AS connected_at
+                            FROM public.device_members m WHERE m.user_id=u.id) items), '[]'::jsonb),
+                'feedback', COALESCE((SELECT jsonb_agg(to_jsonb(items) ORDER BY items.created_at DESC)
+                    FROM (SELECT id, feedback_type, predicted_label, corrected_label,
+                                 review_status, triage_stage, created_at, reviewed_at
+                            FROM public.model_feedback WHERE user_id=u.id
+                           ORDER BY created_at DESC LIMIT 30) items), '[]'::jsonb),
+                'anomalies', COALESCE((SELECT jsonb_agg(to_jsonb(items) ORDER BY items.detected_at DESC)
+                    FROM (SELECT ae.id, c.national_id, ae.anomaly_type, ae.severity,
+                                 ae.score, ae.message, ae.is_active, ae.detected_at
+                            FROM public.anomaly_events ae
+                            JOIN public.cattle c ON c.id=ae.cattle_id
+                           WHERE c.user_id=u.id
+                           ORDER BY ae.detected_at DESC, ae.id DESC LIMIT 30) items), '[]'::jsonb)
+            ) AS payload
+            FROM public.users u
+            WHERE u.id=%s
+            LIMIT 1
+            """,
+            (user_id,),
+        ).fetchone()
+    if not row:
+        raise HTTPException(404, "사용자를 찾을 수 없습니다.")
+    return row["payload"]
+
+
+@router.get("/data/identity/owners")
+def list_identity_owners(admin=Depends(require_admin)):
+    """Return user ownership data used to scope tracks and bindings."""
+    database_url = os.getenv("DATABASE_URL")
+    with psycopg.connect(database_url, row_factory=dict_row) as connection:
+        rows = connection.execute(
+            """
+            WITH cattle_ids AS (
+                SELECT user_id,
+                       array_agg(DISTINCT national_id::text) FILTER (WHERE national_id IS NOT NULL) AS national_ids
+                  FROM public.cattle
+                 GROUP BY user_id
+            ), linked_devices AS (
+                SELECT user_id,
+                       array_agg(DISTINCT device_id::text) FILTER (WHERE device_id IS NOT NULL) AS device_ids
+                  FROM (
+                      SELECT user_id, device_id FROM public.device_owners
+                      UNION ALL
+                      SELECT user_id, device_id FROM public.device_members
+                  ) linked
+                 GROUP BY user_id
+            )
+            SELECT u.id, u.name, u.email,
+                   COALESCE(c.national_ids, ARRAY[]::text[]) AS national_ids,
+                   COALESCE(d.device_ids, ARRAY[]::text[]) AS device_ids
+              FROM public.users u
+              LEFT JOIN cattle_ids c ON c.user_id=u.id
+              LEFT JOIN linked_devices d ON d.user_id=u.id
+             WHERE c.user_id IS NOT NULL OR d.user_id IS NOT NULL
+             ORDER BY COALESCE(u.name, u.email, u.id::text), u.id
+            """
+        ).fetchall()
+    return {"users": [dict(row) for row in rows]}
 
 
 @router.post("/users/by-email")

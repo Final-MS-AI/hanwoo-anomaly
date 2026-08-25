@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./AdminPage.css";
 
@@ -8,7 +8,14 @@ const TRACK_CACHE_KEY = "cowow-admin-tracks";
 const NOTIFICATION_CACHE_KEY = "cowow-admin-notifications";
 const MEMBER_CACHE_KEY = "cowow-admin-members";
 const BINDING_CACHE_KEY = "cowow-admin-recent-bindings";
+const USER_DATA_LIST_CACHE_KEY = "cowow-admin-user-data-list";
+const USER_DATA_DETAIL_CACHE_KEY = "cowow-admin-user-data-details";
+const USER_DATA_SELECTION_KEY = "cowow-admin-user-data-selection";
+const USER_IDENTITY_CACHE_KEY = "cowow-admin-identity-owners";
+const USER_SCOPE_SELECTION_KEY = "cowow-admin-user-scope";
+const USER_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 const trackDetailCache = new Map();
+let adminDataPreloadPromise = null;
 
 function readSessionCache(key, fallback) {
   try {
@@ -17,6 +24,110 @@ function readSessionCache(key, fallback) {
   } catch {
     return fallback;
   }
+}
+
+function readFreshSessionCache(key, fallback) {
+  const cached = readSessionCache(key, null);
+  return cached && Date.now() - Number(cached.savedAt || 0) < USER_DATA_CACHE_TTL_MS ? cached.value : fallback;
+}
+
+function writeFreshSessionCache(key, value) {
+  window.sessionStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), value }));
+}
+
+function useIdentityOwners() {
+  const cachedOwners = readFreshSessionCache(USER_IDENTITY_CACHE_KEY, []);
+  const [owners, setOwners] = useState(cachedOwners);
+  const [loadingOwners, setLoadingOwners] = useState(cachedOwners.length === 0);
+  const [ownerError, setOwnerError] = useState("");
+  const [selectedOwnerId, setSelectedOwnerIdState] = useState(() => readSessionCache(USER_SCOPE_SELECTION_KEY, ""));
+
+  useEffect(() => {
+    if (cachedOwners.length > 0) return undefined;
+    const controller = new AbortController();
+    fetch(`${ADMIN_API}/admin/data/identity/owners`, { credentials: "include", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+        const nextOwners = payload.users || [];
+        setOwners(nextOwners);
+        writeFreshSessionCache(USER_IDENTITY_CACHE_KEY, nextOwners);
+      })
+      .catch((error) => { if (error.name !== "AbortError") setOwnerError(error.message); })
+      .finally(() => { if (!controller.signal.aborted) setLoadingOwners(false); });
+    return () => controller.abort();
+  }, []);
+
+  const setSelectedOwnerId = (value) => {
+    setSelectedOwnerIdState(value);
+    window.sessionStorage.setItem(USER_SCOPE_SELECTION_KEY, JSON.stringify(value));
+  };
+  const ownerFor = (item) => owners.find((owner) => (
+    item.nationalId && owner.national_ids?.includes(String(item.nationalId))
+  ) || (
+    item.cameraId && owner.device_ids?.includes(String(item.cameraId))
+  ));
+  const inSelectedScope = (item) => !selectedOwnerId || String(ownerFor(item)?.id) === String(selectedOwnerId);
+
+  return { owners, loadingOwners, ownerError, selectedOwnerId, setSelectedOwnerId, ownerFor, inSelectedScope };
+}
+
+function preloadAdminWorkspaceData() {
+  if (adminDataPreloadPromise) return adminDataPreloadPromise;
+  adminDataPreloadPromise = (async () => {
+    const preloadIdentityOwners = async () => {
+      if (readFreshSessionCache(USER_IDENTITY_CACHE_KEY, []).length > 0) return;
+      const response = await fetch(`${ADMIN_API}/admin/data/identity/owners`, { credentials: "include" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      writeFreshSessionCache(USER_IDENTITY_CACHE_KEY, payload.users || []);
+    };
+
+    const preloadBindings = async () => {
+      if (readSessionCache(BINDING_CACHE_KEY, []).length > 0) return;
+      const response = await fetch(`${MUZZLE_API}/tracks/bindings/recent?limit=10`, { credentials: "include" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      window.sessionStorage.setItem(BINDING_CACHE_KEY, JSON.stringify(payload.bindings || []));
+    };
+
+    const preloadMembers = async () => {
+      if ((readSessionCache(MEMBER_CACHE_KEY, {}).users || []).length > 0) return;
+      const response = await fetch(`${ADMIN_API}/admin/users`, { credentials: "include" });
+      if (!response.ok) return;
+      const payload = await response.json();
+      window.sessionStorage.setItem(MEMBER_CACHE_KEY, JSON.stringify({ users: payload.users || [], canRevoke: payload.can_revoke === true }));
+    };
+
+    const preloadUsers = async () => {
+      let users = readFreshSessionCache(USER_DATA_LIST_CACHE_KEY, []);
+      if (users.length === 0) {
+        const response = await fetch(`${ADMIN_API}/admin/data/users`, { credentials: "include" });
+        if (!response.ok) return;
+        const payload = await response.json();
+        users = payload.users || [];
+        writeFreshSessionCache(USER_DATA_LIST_CACHE_KEY, users);
+      }
+
+      const details = readFreshSessionCache(USER_DATA_DETAIL_CACHE_KEY, {});
+      const pendingIds = users.map((user) => String(user.id)).filter((id) => !details[id]);
+      let nextIndex = 0;
+      const worker = async () => {
+        while (nextIndex < pendingIds.length) {
+          const id = pendingIds[nextIndex];
+          nextIndex += 1;
+          const response = await fetch(`${ADMIN_API}/admin/data/users/${id}`, { credentials: "include" });
+          if (!response.ok) continue;
+          details[id] = await response.json();
+          writeFreshSessionCache(USER_DATA_DETAIL_CACHE_KEY, details);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, pendingIds.length) }, worker));
+    };
+
+    await Promise.allSettled([preloadIdentityOwners(), preloadBindings(), preloadMembers(), preloadUsers()]);
+  })().finally(() => { adminDataPreloadPromise = null; });
+  return adminDataPreloadPromise;
 }
 
 function formatCurrentDate() {
@@ -32,6 +143,7 @@ const navItems = [
   ["overview", "▦", "개요"],
   ["feedback", "↗", "피드백"],
   ["loop", "⟳", "학습 루프"],
+  ["user-data", "◉", "사용자 데이터"],
   ["members", "♙", "사용자 관리"],
   ["help", "?", "도움말"],
 ];
@@ -50,6 +162,7 @@ function trackToFeedback(track) {
     status: reviewStatus,
     tone: reviewStatus === "승인됨" ? "green" : reviewStatus === "보류됨" ? "orange" : "blue",
     nationalId: track.national_id,
+    cameraId: track.camera_id,
     frameCount: track.frame_count ?? 0,
     similarity: track.similarity,
   };
@@ -69,6 +182,7 @@ function AdminPage() {
   const [notifications, setNotifications] = useState(cachedNotifications.notifications || []);
   const [unreadCount, setUnreadCount] = useState(cachedNotifications.unreadCount || 0);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [userDataRefreshKey, setUserDataRefreshKey] = useState(0);
 
   useEffect(() => {
     if (!notice) return undefined;
@@ -113,6 +227,7 @@ function AdminPage() {
     if (permission === "granted") {
       loadTracks();
       loadNotifications();
+      preloadAdminWorkspaceData();
     }
   }, [permission]);
 
@@ -199,13 +314,14 @@ function AdminPage() {
         </header>
 
         <div className="admin-main">
-          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]}</h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
+          <div className="admin-heading-row"><div><p className="eyebrow">{formatCurrentDate()}</p><h1>{activeNav === "overview" ? "관리자님, 좋은 아침이에요" : navItems.find(([key]) => key === activeNav)?.[2]}</h1><p className="admin-subtitle">{activeNav === "overview" ? "오늘의 모델 상태와 피드백 흐름을 한눈에 확인하세요." : activeNav === "user-data" ? "가입 사용자별 소유 개체와 운영 데이터를 조회하세요." : "비문 식별과 ID 역전파 운영 현황을 관리하세요."}</p></div><button className="primary-button" type="button" onClick={() => { if (activeNav === "user-data") setUserDataRefreshKey((key) => key + 1); else refreshAdminData(); setNotice("최신 데이터로 새로고침했습니다."); }}>↻ 데이터 새로고침</button></div>
 
           {notice && <div className="admin-toast" role="status">✓ {notice}</div>}
 
           {activeNav === "overview" && <OverviewContent tracks={feedback} filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} setActiveNav={setActiveNav} reviewItem={reviewItem} trackLoading={trackLoading} onBound={refreshAdminData} notifications={notifications} />}
           {activeNav === "feedback" && <FeedbackHub filteredFeedback={filteredFeedback} filter={filter} setFilter={setFilter} reviewItem={reviewItem} onBound={refreshAdminData} trackLoading={trackLoading} trackError={trackError} />}
           {activeNav === "loop" && <LoopWorkspace setActiveNav={setActiveNav} tracks={feedback} />}
+          {activeNav === "user-data" && <UserDataWorkspace refreshKey={userDataRefreshKey} />}
           {activeNav === "members" && <MembersWorkspace />}
           {activeNav === "help" && <HelpWorkspace />}
         </div>
@@ -286,7 +402,9 @@ function FeedbackHub({ filteredFeedback, filter, setFilter, reviewItem, onBound,
 
 function FeedbackWorkspace({ filteredFeedback, filter, setFilter, reviewItem, onBound, trackLoading, trackError }) {
   const [selectedSegment, setSelectedSegment] = useState(null);
-  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {filteredFeedback.filter((item) => item.status === "검토 대기").length}건</span></div>{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={filteredFeedback.length} />{trackLoading && filteredFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : filteredFeedback.length === 0 ? <div className="empty-state">선택한 조건에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{filteredFeedback.map((item) => <FeedbackRow key={item.id} item={item} onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /> </>;
+  const userScope = useIdentityOwners();
+  const scopedFeedback = filteredFeedback.filter(userScope.inSelectedScope);
+  return <><section className="admin-panel full-panel feedback-workspace"><div className="panel-heading"><div><h2>ID 역전파 피드백</h2><p>muzzle API에서 불러온 실제 트랙과 현재 바인딩 상태입니다.</p></div><span className="count-badge">검토 대기 {scopedFeedback.filter((item) => item.status === "검토 대기").length}건</span></div><UserScopeFilter {...userScope} />{trackError && <div className="api-error" role="alert">⚠ {trackError}</div>}<FeedbackFilters filter={filter} setFilter={setFilter} count={scopedFeedback.length} />{trackLoading && scopedFeedback.length === 0 ? <div className="empty-state">muzzle 트랙을 불러오는 중입니다…</div> : scopedFeedback.length === 0 ? <div className="empty-state">선택한 조건과 사용자에 해당하는 트랙이 없습니다.</div> : <div className="feedback-list expanded-feedback-list">{scopedFeedback.map((item) => <FeedbackRow key={item.id} item={item} owner={userScope.ownerFor(item)} showOwner onReview={reviewItem} onSelect={setSelectedSegment} expanded />)}</div>}</section>{selectedSegment && <TrackDetailPanel segmentId={selectedSegment} onClose={() => setSelectedSegment(null)} onChanged={onBound} />}<BindingForm onBound={onBound} /> </>;
 }
 
 function AiFeedbackWorkspace() {
@@ -556,12 +674,18 @@ function FeedbackFilters({ filter, setFilter, count }) {
   return <div className="filter-row"><div className="filter-tabs">{["전체", "ID 역전파", "바인딩 충돌", "미확정 트랙"].map((item) => <button type="button" key={item} className={filter === item ? "selected" : ""} onClick={() => setFilter(item)}>{item}</button>)}</div><span className="muted-count">{count}건</span></div>;
 }
 
+function UserScopeFilter({ owners, loadingOwners, ownerError, selectedOwnerId, setSelectedOwnerId }) {
+  return <div className="user-scope-filter"><label htmlFor="admin-user-scope">사용자 기준</label><select id="admin-user-scope" value={selectedOwnerId} onChange={(event) => setSelectedOwnerId(event.target.value)} disabled={loadingOwners}><option value="">전체 사용자</option>{owners.map((owner) => <option key={owner.id} value={owner.id}>{owner.name || owner.email || `사용자 #${owner.id}`} · #{owner.id}</option>)}</select><span>{loadingOwners ? "사용자 연결 정보 확인 중…" : ownerError ? `사용자 연결 정보 오류: ${ownerError}` : `${owners.length}명 연결됨`}</span></div>;
+}
+
 function LoopWorkspace({ setActiveNav, tracks }) {
   const cachedBindings = readSessionCache(BINDING_CACHE_KEY, []);
   const [bindings, setBindings] = useState(cachedBindings);
   const [loading, setLoading] = useState(cachedBindings.length === 0);
   const [error, setError] = useState("");
+  const userScope = useIdentityOwners();
   useEffect(() => {
+    if (cachedBindings.length > 0) return undefined;
     let cancelled = false;
     fetch(`${MUZZLE_API}/tracks/bindings/recent?limit=10`, { credentials: "include" })
       .then(async (response) => {
@@ -577,16 +701,18 @@ function LoopWorkspace({ setActiveNav, tracks }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, []);
-  const hasTracks = tracks.length > 0;
-  const hasBindings = bindings.length > 0 || tracks.some((item) => item.nationalId);
+  const scopedTracks = tracks.filter(userScope.inSelectedScope);
+  const scopedBindings = bindings.filter((item) => userScope.inSelectedScope({ nationalId: item.national_id }));
+  const hasTracks = scopedTracks.length > 0;
+  const hasBindings = scopedBindings.length > 0 || scopedTracks.some((item) => item.nationalId);
   const steps = [
     ["✓", "비문 식별", "코무늬 임베딩과 유사도 비교", hasTracks ? "done" : "pending"],
     [hasBindings ? "✓" : "02", "트랙 연결", "track_segment에 개체 바인딩", hasBindings ? "done" : "pending"],
     [hasBindings ? "✓" : "03", "ID 역전파", "과거 track_observation에 소급", hasBindings ? "done" : "pending"],
-    [bindings.length ? "✓" : "04", "타임라인 확인", "개체별 이력으로 조회", bindings.length ? "done" : "pending"],
+    [scopedBindings.length ? "✓" : "04", "타임라인 확인", "개체별 이력으로 조회", scopedBindings.length ? "done" : "pending"],
   ];
-  const loopStatus = loading ? "API 확인 중" : error ? "API 오류" : bindings.length ? "데이터 반영 중" : "대기 중";
-  return <><section className="admin-panel full-panel loop-detail-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>실제 muzzle API 데이터 기준 처리 현황입니다.</p></div><span className="running-badge"><span /> {loopStatus}</span></div><div className="large-loop">{steps.map(([icon, title, detail, status]) => <div className={`large-loop-step ${status}`} key={title}><b>{icon}</b><strong>{title}</strong><small>{detail}</small></div>)}</div></section><section className="admin-panel full-panel"><div className="panel-heading"><div><h2>최근 바인딩 작업</h2><p>muzzle API에서 조회한 실제 바인딩 기록입니다.</p></div><button className="secondary-button compact-button" type="button" onClick={() => setActiveNav("feedback")}>피드백에서 확인 →</button></div>{loading ? <div className="empty-state">최근 바인딩 작업을 불러오는 중입니다…</div> : error ? <div className="api-error">최근 바인딩 작업을 불러오지 못했습니다: {error}</div> : bindings.length === 0 ? <div className="empty-state">아직 바인딩된 작업이 없습니다.</div> : <div className="binding-table"><div className="binding-head"><span>트랙</span><span>개체 ID</span><span>반영 관측</span><span>유사도</span><span>처리 시각</span></div>{bindings.map((item) => <div key={`${item.segment_id}-${item.decided_at}`}><strong>segment #{item.segment_id}</strong><span>{item.national_id}</span><span>{item.affected_observations}건</span><span>{Number(item.similarity ?? 0).toFixed(4)}</span><span>{item.decided_at ? new Date(item.decided_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</span></div>)}</div>}</section></>;
+  const loopStatus = loading ? "API 확인 중" : error ? "API 오류" : scopedBindings.length ? "데이터 반영 중" : "대기 중";
+  return <><section className="admin-panel full-panel loop-detail-panel"><div className="panel-heading"><div><h2>비문 ID 역전파 흐름</h2><p>실제 muzzle API 데이터 기준 처리 현황입니다.</p></div><span className="running-badge"><span /> {loopStatus}</span></div><UserScopeFilter {...userScope} /><div className="large-loop">{steps.map(([icon, title, detail, status]) => <div className={`large-loop-step ${status}`} key={title}><b>{icon}</b><strong>{title}</strong><small>{detail}</small></div>)}</div></section><section className="admin-panel full-panel"><div className="panel-heading"><div><h2>최근 바인딩 작업</h2><p>muzzle API에서 조회한 실제 바인딩 기록입니다.</p></div><button className="secondary-button compact-button" type="button" onClick={() => setActiveNav("feedback")}>피드백에서 확인 →</button></div>{loading ? <div className="empty-state">최근 바인딩 작업을 불러오는 중입니다…</div> : error ? <div className="api-error">최근 바인딩 작업을 불러오지 못했습니다: {error}</div> : scopedBindings.length === 0 ? <div className="empty-state">선택한 사용자에게 연결된 바인딩 작업이 없습니다.</div> : <div className="binding-table user-scoped-binding-table"><div className="binding-head"><span>트랙</span><span>개체 ID</span><span>사용자</span><span>반영 관측</span><span>유사도</span><span>처리 시각</span></div>{scopedBindings.map((item) => { const owner = userScope.ownerFor({ nationalId: item.national_id }); return <div key={`${item.segment_id}-${item.decided_at}`}><strong>segment #{item.segment_id}</strong><span>{item.national_id}</span><span>{owner?.name || owner?.email || "미연결"}</span><span>{item.affected_observations}건</span><span>{Number(item.similarity ?? 0).toFixed(4)}</span><span>{item.decided_at ? new Date(item.decided_at).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-"}</span></div>; })}</div>}</section></>;
 }
 
 function MembersWorkspace() {
@@ -628,7 +754,10 @@ function MembersWorkspace() {
       setMembersLoading(false);
     }
   };
-  useEffect(() => { loadMembers(); }, []);
+  useEffect(() => {
+    if ((cachedMembers.users || []).length > 0) return;
+    loadMembers();
+  }, []);
   const addMember = async (event) => {
     event.preventDefault();
     if (isAdding) return;
@@ -657,6 +786,113 @@ function MembersWorkspace() {
     if (response.ok) loadMembers();
   };
   return <section className="admin-panel full-panel members-workspace"><div className="panel-heading"><div><h2>사용자 및 권한</h2><p>DB에 저장된 관리자 권한을 추가하거나 해제합니다.</p></div><span className="api-connected-badge">DB 권한 관리</span></div><form className="member-add-form" onSubmit={addMember}><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="추가할 사용자 이메일" disabled={isAdding} required /><button className="primary-button" type="submit" disabled={isAdding}>{isAdding ? "추가 중…" : "+ 관리자 추가"}</button></form>{message && <p className={`binding-message ${messageType}`} role="status">{message}</p>}<div className="member-list">{members.map((member, index) => <div key={member.id}><span className={`member-avatar ${["blue", "green", "orange"][index % 3]}`}>관</span><div><strong>{member.name || "이름 없음"}</strong><small>{member.email}</small></div><em>관리자</em><button className="member-remove" type="button" onClick={() => removeMember(member.id)} disabled={!canRevoke || member.provider === "admin"} title={member.provider === "admin" ? "최고 관리자 계정은 해제할 수 없습니다." : !canRevoke ? "최고 관리자만 해제할 수 있습니다." : "관리자 권한 해제"}>{member.provider === "admin" ? "최고 관리자" : "해제"}</button></div>)}{membersLoading && members.length === 0 && <div className="empty-state">관리자 목록을 불러오는 중입니다…</div>}{!membersLoading && members.length === 0 && <div className="empty-state">등록된 관리자가 없습니다.</div>}</div></section>;
+}
+
+function UserDataWorkspace({ refreshKey }) {
+  const [initialCache] = useState(() => ({
+    users: readFreshSessionCache(USER_DATA_LIST_CACHE_KEY, []),
+    details: readFreshSessionCache(USER_DATA_DETAIL_CACHE_KEY, {}),
+    selectedId: readSessionCache(USER_DATA_SELECTION_KEY, ""),
+  }));
+  const [users, setUsers] = useState(initialCache.users);
+  const [selectedId, setSelectedIdState] = useState(() => initialCache.users.some((user) => String(user.id) === String(initialCache.selectedId)) ? initialCache.selectedId : initialCache.users[0]?.id || "");
+  const [detail, setDetail] = useState(() => initialCache.details[String(initialCache.selectedId)] || initialCache.details[String(initialCache.users[0]?.id)] || null);
+  const [query, setQuery] = useState("");
+  const [loadingUsers, setLoadingUsers] = useState(initialCache.users.length === 0);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [error, setError] = useState("");
+  const listRefreshKey = useRef(refreshKey);
+  const detailRefreshKey = useRef(refreshKey);
+  const setSelectedId = (value) => {
+    setSelectedIdState(value);
+    window.sessionStorage.setItem(USER_DATA_SELECTION_KEY, JSON.stringify(value));
+  };
+
+  const loadUsers = async (search = "") => {
+    setLoadingUsers(true);
+    setError("");
+    try {
+      const suffix = search.trim() ? `?q=${encodeURIComponent(search.trim())}` : "";
+      const response = await fetch(`${ADMIN_API}/admin/data/users${suffix}`, { credentials: "include" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+      const nextUsers = payload.users || [];
+      setUsers(nextUsers);
+      if (!search.trim()) writeFreshSessionCache(USER_DATA_LIST_CACHE_KEY, nextUsers);
+      setSelectedIdState((current) => {
+        const nextId = nextUsers.some((user) => String(user.id) === String(current)) ? current : nextUsers[0]?.id || "";
+        window.sessionStorage.setItem(USER_DATA_SELECTION_KEY, JSON.stringify(nextId));
+        return nextId;
+      });
+      if (nextUsers.length === 0) setDetail(null);
+    } catch (requestError) {
+      setError(`사용자 목록을 불러오지 못했습니다: ${requestError.message}`);
+      setUsers([]);
+      setDetail(null);
+    } finally {
+      setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    const forceRefresh = refreshKey !== listRefreshKey.current;
+    listRefreshKey.current = refreshKey;
+    if (!forceRefresh && initialCache.users.length > 0) return;
+    loadUsers();
+  }, [refreshKey]);
+  useEffect(() => {
+    if (!selectedId) return undefined;
+    const cachedDetails = readFreshSessionCache(USER_DATA_DETAIL_CACHE_KEY, {});
+    const cachedDetail = cachedDetails[String(selectedId)];
+    const forceRefresh = refreshKey !== detailRefreshKey.current;
+    detailRefreshKey.current = refreshKey;
+    if (!forceRefresh && cachedDetail) {
+      setDetail(cachedDetail);
+      setLoadingDetail(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    setLoadingDetail(true);
+    setError("");
+    fetch(`${ADMIN_API}/admin/data/users/${selectedId}`, { credentials: "include", signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.detail || `HTTP ${response.status}`);
+        setDetail(payload);
+        writeFreshSessionCache(USER_DATA_DETAIL_CACHE_KEY, { ...cachedDetails, [String(selectedId)]: payload });
+      })
+      .catch((requestError) => {
+        if (requestError.name !== "AbortError") setError(`사용자 데이터를 불러오지 못했습니다: ${requestError.message}`);
+      })
+      .finally(() => { if (!controller.signal.aborted) setLoadingDetail(false); });
+    return () => controller.abort();
+  }, [selectedId, refreshKey]);
+
+  const submitSearch = (event) => { event.preventDefault(); loadUsers(query); };
+  const selectedUser = users.find((user) => String(user.id) === String(selectedId));
+  const dateText = (value) => value ? new Date(value).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "-";
+
+  return <div className="user-data-workspace">
+    <section className="admin-panel full-panel user-data-header">
+      <div className="panel-heading"><div><h2>사용자별 데이터 조회</h2><p>가입 사용자를 선택해 소유 한우, 연결 장비, 피드백과 이상 이벤트를 확인합니다.</p></div><span className="api-connected-badge">개발자 전용</span></div>
+      <form className="user-search-form" onSubmit={submitSearch}><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="이름, 이메일 또는 사용자 ID 검색" /><button className="primary-button" type="submit" disabled={loadingUsers}>{loadingUsers ? "조회 중…" : "검색"}</button><button className="secondary-button" type="button" onClick={() => { setQuery(""); loadUsers(""); }}>전체</button></form>
+      {error && <div className="api-error" role="alert">⚠ {error}</div>}
+    </section>
+    <div className="user-data-layout">
+      <section className="admin-panel user-directory"><div className="panel-heading"><div><h2>사용자</h2><p>{users.length}명 조회됨</p></div></div><div className="user-directory-list">{users.map((user) => <button type="button" key={user.id} className={String(user.id) === String(selectedId) ? "selected" : ""} onClick={() => setSelectedId(user.id)}><span className="user-data-avatar">{(user.name || user.email || "U").slice(0, 1).toUpperCase()}</span><span><strong>{user.name || "이름 없음"}</strong><small>{user.email || `${user.provider} 사용자`} · #{user.id}</small></span><em>{user.cattle_count}두 · 장비 {user.device_count}</em></button>)}{!loadingUsers && users.length === 0 && <div className="empty-state">조건에 맞는 사용자가 없습니다.</div>}</div></section>
+      <section className="user-data-detail">{loadingDetail ? <div className="admin-panel empty-state">사용자 데이터를 불러오는 중입니다…</div> : detail ? <>
+        <section className="admin-panel selected-user-card"><div><p className="eyebrow">SELECTED USER</p><h2>{detail.user.name || selectedUser?.name || "이름 없음"}</h2><p>{detail.user.email || "이메일 없음"} · {detail.user.provider} · 사용자 #{detail.user.id}</p></div>{detail.user.is_admin && <span className="admin-user-badge">개발자 권한</span>}</section>
+        <div className="user-summary-grid"><UserSummary label="등록 한우" value={`${detail.summary.cattle}두`} tone="green" /><UserSummary label="연결 장비" value={`${detail.summary.devices}대`} tone="blue" /><UserSummary label="제출 피드백" value={`${detail.summary.feedback}건`} tone="purple" /><UserSummary label="이상 이벤트" value={`${detail.summary.anomalies}건`} sub={`활성 ${detail.summary.active_anomalies}건`} tone="orange" /></div>
+        <section className="admin-panel user-data-section"><div className="panel-heading"><div><h2>등록 한우</h2><p>사용자 소유 개체와 이상 이벤트 현황입니다.</p></div></div><div className="user-data-table"><div className="user-data-table-head"><span>개체번호</span><span>축사</span><span>상태</span><span>이상 기록</span><span>최근 이상</span></div>{detail.cattle.map((item) => <div key={item.id}><strong>{item.national_id || `COW-${item.id}`}</strong><span>{item.barn_id || "-"}</span><span>{item.status || "-"}</span><span>{item.anomaly_count}건 {item.active_anomaly_count > 0 && <em>활성 {item.active_anomaly_count}</em>}</span><span>{dateText(item.last_anomaly_at)}</span></div>)}{detail.cattle.length === 0 && <div className="empty-state">등록된 한우가 없습니다.</div>}</div></section>
+        <div className="user-data-two-column"><section className="admin-panel user-data-section"><div className="panel-heading"><div><h2>연결 장비</h2><p>소유 및 공유 장비입니다.</p></div></div><div className="compact-data-list">{detail.devices.map((item) => <div key={`${item.device_id}-${item.role}`}><strong>{item.device_id}</strong><span>{item.role === "owner" ? "소유자" : "공유 구성원"}</span><small>{dateText(item.connected_at)}</small></div>)}{detail.devices.length === 0 && <div className="empty-state">연결된 장비가 없습니다.</div>}</div></section><section className="admin-panel user-data-section"><div className="panel-heading"><div><h2>최근 피드백</h2><p>최근 제출 30건입니다.</p></div></div><div className="compact-data-list">{detail.feedback.slice(0, 8).map((item) => <div key={item.id}><strong>{item.feedback_type}</strong><span>{item.corrected_label || item.predicted_label || "라벨 없음"}</span><small>{item.review_status} · {dateText(item.created_at)}</small></div>)}{detail.feedback.length === 0 && <div className="empty-state">제출된 피드백이 없습니다.</div>}</div></section></div>
+        <section className="admin-panel user-data-section"><div className="panel-heading"><div><h2>최근 이상 이벤트</h2><p>사용자 소유 한우에서 발생한 최근 30건입니다.</p></div></div><div className="compact-data-list anomaly-data-list">{detail.anomalies.map((item) => <div key={item.id}><strong>{item.national_id || "미확인 개체"}</strong><span>{item.anomaly_type} · {item.message || "이상 이벤트"}</span><em className={`severity-pill ${item.severity}`}>{item.severity}</em><small>{dateText(item.detected_at)}</small></div>)}{detail.anomalies.length === 0 && <div className="empty-state">이상 이벤트가 없습니다.</div>}</div></section>
+      </> : <div className="admin-panel empty-state">왼쪽에서 사용자를 선택하세요.</div>}</section>
+    </div>
+  </div>;
+}
+
+function UserSummary({ label, value, sub, tone }) {
+  return <div className={`user-summary-card ${tone}`}><span>{label}</span><strong>{value}</strong>{sub && <small>{sub}</small>}</div>;
 }
 
 function HelpWorkspace() {
@@ -705,7 +941,7 @@ function ActivityPanel({ notifications = [] }) {
 }
 
 function MetricCard({ label, value, delta, note, accent, icon }) { return <article className={`metric-card ${accent}`}><div className="metric-icon">{icon}</div><p>{label}</p><strong>{value}</strong><div><span>{delta}</span> <small>{note}</small></div></article>; }
-function FeedbackRow({ item, onReview, onSelect, expanded = false }) { const isPending = item.status === "검토 대기"; return <article className={`feedback-row ${expanded ? "expanded" : ""}`}><span className={`feedback-type ${item.tone}`}>{item.type}</span><div className="feedback-copy"><strong>{item.subject}</strong><span>{item.detail}</span><small>{item.id} · {item.user} · {item.time}</small></div><span className={`review-status ${item.status === "승인됨" ? "approved" : item.status === "보류됨" ? "held" : "pending"}`}>{item.status}</span>{item.segmentId && <button className="detail-action" type="button" onClick={() => onSelect?.(item.segmentId)}>상세</button>}{isPending && item.nationalId && <div className="row-actions"><button className="approve-action" type="button" onClick={() => onReview(item.id, "승인됨")} aria-label={`${item.id} 승인`}><span>✓</span> 승인</button><button className="hold-action" type="button" onClick={() => onReview(item.id, "보류됨")} aria-label={`${item.id} 보류`}><span>×</span> 보류</button></div>}</article>; }
+function FeedbackRow({ item, owner, showOwner = false, onReview, onSelect, expanded = false }) { const isPending = item.status === "검토 대기"; return <article className={`feedback-row ${expanded ? "expanded" : ""}`}><span className={`feedback-type ${item.tone}`}>{item.type}</span><div className="feedback-copy"><strong>{item.subject}</strong><span>{item.detail}</span><small>{item.id}{showOwner ? ` · 사용자 ${owner?.name || owner?.email || "미연결"}` : ""} · {item.user} · {item.time}</small></div>{showOwner && <span className="feedback-owner">{owner ? `#${owner.id}` : "미연결"}</span>}<span className={`review-status ${item.status === "승인됨" ? "approved" : item.status === "보류됨" ? "held" : "pending"}`}>{item.status}</span>{item.segmentId && <button className="detail-action" type="button" onClick={() => onSelect?.(item.segmentId)}>상세</button>}{isPending && item.nationalId && <div className="row-actions"><button className="approve-action" type="button" onClick={() => onReview(item.id, "승인됨")} aria-label={`${item.id} 승인`}><span>✓</span> 승인</button><button className="hold-action" type="button" onClick={() => onReview(item.id, "보류됨")} aria-label={`${item.id} 보류`}><span>×</span> 보류</button></div>}</article>; }
 function Activity({ icon, tone, title, detail, time }) { return <div className="activity-row"><span className={`activity-icon ${tone}`}>{icon}</span><div><strong>{title}</strong><p>{detail}</p></div><time>{time}</time></div>; }
 
 export default AdminPage;
