@@ -209,7 +209,7 @@ def get_dashboard(
                     WITH ranked_realtime AS (
                         SELECT e.id, e.device_id, e.camera_id, e.cattle_id,
                                e.status, e.behavior, e.confidence, e.detected_at,
-                               e.image_blob_name, e.video_blob_name,
+                               e.image_blob_name, e.video_blob_name, e.metadata,
                                ROW_NUMBER() OVER (
                                    PARTITION BY
                                        e.device_id,
@@ -228,6 +228,11 @@ def get_dashboard(
                                ) AS rn
                         FROM public.device_anomaly_events e
                         WHERE e.resolved_at IS NULL
+                          -- Feeding is a normal activity and is not displayed
+                          -- as an active abnormal event.
+                          AND LOWER(COALESCE(e.behavior, '')) NOT IN (
+                              'feeding', 'eating', '섭식', '섭식 중'
+                          )
                           AND (
                             EXISTS (
                                 SELECT 1 FROM public.device_owners o
@@ -251,7 +256,7 @@ def get_dashboard(
                     )
                     SELECT id, device_id, camera_id, cattle_id,
                            status, behavior, confidence, detected_at,
-                           image_blob_name, video_blob_name
+                           image_blob_name, video_blob_name, metadata
                     FROM ranked_realtime
                     WHERE rn = 1
                     ORDER BY detected_at DESC
@@ -316,12 +321,18 @@ def get_dashboard(
     }
     realtime_cattle = []
     for row in realtime_rows:
-        display_id = row[3] or f"{row[2] or row[1]} 미확인 개체"
+        national_id = row[3]
+        display_id = (
+            f"COW-{national_id[-3:]}"
+            if national_id and national_id.startswith("99")
+            else (national_id or f"{row[2] or row[1]} 미확인 개체")
+        )
         realtime_cattle.append(
             {
                 "cattle_id": str(row[0]),
                 "display_id": display_id,
-                "national_id": None,
+                "national_id": row[3],
+                "track_id": (row[10] or {}).get("trackId"),
                 "ear_tag_number": None,
                 "anomaly_type": row[5],
                 "severity": row[4],
@@ -382,7 +393,11 @@ def get_dashboard(
     recent_alerts.extend(
         {
             "cattle_id": str(row[0]),
-            "display_id": row[3] or f"{row[2] or row[1]} 미확인 개체",
+            "display_id": (
+                f"COW-{row[3][-3:]}"
+                if row[3] and row[3].startswith("99")
+                else (row[3] or f"{row[2] or row[1]} 미확인 개체")
+            ),
             "anomaly_type": row[5],
             "severity": row[4],
             "score": row[6],

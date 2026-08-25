@@ -299,6 +299,7 @@ def create_anomaly_event(
     status: str = Form(),
     behavior: str = Form(min_length=1, max_length=300),
     cattleId: str | None = Form(default=None, max_length=100),
+    trackId: str | None = Form(default=None, max_length=100),
     confidence: float | None = Form(default=None, ge=0, le=1),
     detectedAt: str | None = Form(default=None),
     sessionId: str | None = Form(default=None, max_length=200),
@@ -339,9 +340,9 @@ def create_anomaly_event(
                 INSERT INTO device_anomaly_events (
                     id, device_id, camera_id, cattle_id, status, behavior,
                     confidence, detected_at, analysis_session_id,
-                    image_blob_name, video_blob_name
+                    image_blob_name, video_blob_name, metadata
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """,
                 (
                     event_id,
@@ -355,6 +356,9 @@ def create_anomaly_event(
                     sessionId.strip() if sessionId else None,
                     image_blob_name,
                     video_blob_name,
+                    psycopg.types.json.Jsonb(
+                        {"trackId": trackId.strip()} if trackId else {}
+                    ),
                 ),
             )
         connection.commit()
