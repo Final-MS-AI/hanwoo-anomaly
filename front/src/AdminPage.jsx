@@ -450,6 +450,8 @@ function AiFeedbackWorkspace() {
   const [loading, setLoading] = useState(initialItems === null);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [processingFeedbackId, setProcessingFeedbackId] = useState(null);
+  const reviewInFlightRef = useRef(new Set());
 
   const loadFeedback = async (nextStatus = status, { force = false } = {}) => {
     const cached = readFreshSessionCache(aiFeedbackCacheKey(nextStatus), null);
@@ -477,8 +479,15 @@ function AiFeedbackWorkspace() {
   }, [status]);
 
   const review = async (item, nextStatus) => {
+    const feedbackId = String(item.id);
+
+    if (reviewInFlightRef.current.has(feedbackId)) return;
+
+    reviewInFlightRef.current.add(feedbackId);
+    setProcessingFeedbackId(feedbackId);
     setMessage("");
     setError("");
+
     try {
       const response = await fetch(
         `${ADMIN_API}/admin/feedback/${item.id}/review`,
@@ -492,6 +501,7 @@ function AiFeedbackWorkspace() {
           }),
         },
       );
+
       const payload = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(payload?.detail || `HTTP ${response.status}`);
 
@@ -504,6 +514,11 @@ function AiFeedbackWorkspace() {
       await loadFeedback(status, { force: true });
     } catch (err) {
       setError(`검토 처리에 실패했습니다: ${err.message}`);
+    } finally {
+      reviewInFlightRef.current.delete(feedbackId);
+      setProcessingFeedbackId((current) =>
+        current === feedbackId ? null : current
+      );
     }
   };
 
@@ -611,11 +626,21 @@ function AiFeedbackWorkspace() {
                     placeholder="관리자 검토 메모(선택)"
                     maxLength={1000}
                   />
-                  <button className="approve-action" type="button" onClick={() => review(item, "approved")}>
-                    ✓ 승인
+                  <button
+                    className="approve-action"
+                    type="button"
+                    onClick={() => review(item, "approved")}
+                    disabled={processingFeedbackId === String(item.id)}
+                  >
+                    {processingFeedbackId === String(item.id) ? "처리 중…" : "✓ 승인"}
                   </button>
-                  <button className="hold-action" type="button" onClick={() => review(item, "rejected")}>
-                    × 반려
+                  <button
+                    className="hold-action"
+                    type="button"
+                    onClick={() => review(item, "rejected")}
+                    disabled={processingFeedbackId === String(item.id)}
+                  >
+                    {processingFeedbackId === String(item.id) ? "처리 중…" : "× 반려"}
                   </button>
                 </div>
               )}
