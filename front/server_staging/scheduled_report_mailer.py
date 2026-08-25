@@ -10,15 +10,11 @@ import html
 import os
 import smtplib
 import textwrap
-from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 
 from dotenv import load_dotenv
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfgen import canvas
+from weasyprint import HTML
 
 # The FastAPI service keeps secrets outside the repository. Load it before
 # importing device_claim_api, which reads DATABASE_URL at import time.
@@ -31,7 +27,6 @@ from operations_report_api import control_durations, ensure_schema, number, wind
 DEVICE_ID = os.getenv("ESP32_PHYSICAL_DEVICE_ID", "ESP32-01")
 REPORT_DAYS = max(1, min(31, int(os.getenv("REPORT_EMAIL_DAYS", "7"))))
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hanwoo.koreacentral.cloudapp.azure.com").rstrip("/")
-PDF_FONT_NAME = "COWOWNanumGothic"
 PDF_FONT_PATH = os.getenv(
     "COWOW_REPORT_FONT_PATH",
     "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
@@ -235,29 +230,46 @@ def report_pdf(owner_name, report):
     return bytes(output)
 
 
+def report_pdf_html(owner_name, report):
+    def card(label, value, note=""):
+        return f"<td class='metric-card'><div class='label'>{html.escape(label)}</div><strong>{html.escape(value)}</strong><small>{html.escape(note)}</small></td>"
+
+    anomaly_rows = "".join(
+        f"<tr><td>{html.escape(str(cattle_id))}</td><td>{html.escape(str(behavior))}</td><td>{html.escape(str(status))}</td><td>{count}건</td></tr>"
+        for cattle_id, behavior, status, count, _ in report["anomalies"]
+    ) or "<tr><td colspan='4' class='empty'>기간 내 확인이 필요한 이상행동 기록이 없습니다.</td></tr>"
+    control_rows = "".join(
+        f"<tr><td>{html.escape(str(item['actuator']))}</td><td>{item['commandCount']}건</td><td>{duration(item['estimatedOnSeconds'])}</td></tr>"
+        for item in report["controls"]
+    ) or "<tr><td colspan='3' class='empty'>완료된 제어 명령이 없습니다.</td></tr>"
+    report_day = report["end"].astimezone().strftime("%Y년 %m월 %d일")
+    period = f"{report['start'].astimezone().strftime('%Y.%m.%d')} ~ {report['end'].astimezone().strftime('%Y.%m.%d')}"
+    return f"""<!doctype html><html lang='ko'><head><meta charset='utf-8'><style>
+    @font-face {{ font-family: Cowow; src: url('file://{PDF_FONT_PATH}'); }}
+    @page {{ size: A4; margin: 12mm 13mm; }}
+    * {{ box-sizing: border-box; }} body {{ font-family: Cowow, sans-serif; color:#30251d; font-size:10px; line-height:1.5; }}
+    header {{ border-bottom:1px solid #d9cbb9; padding-bottom:13px; }} .eyebrow {{ color:#287343; font-size:11px; font-weight:700; }}
+    h1 {{ font-size:23px; margin:5px 0 4px; }} .sub {{ color:#806f60; margin:0; }} .period {{ float:right; color:#806f60; font-size:9px; margin-top:-16px; }}
+    table {{ border-spacing:0; width:100%; }} .cards {{ margin-top:14px; border-spacing:8px 0; margin-left:-8px; width:calc(100% + 16px); }}
+    .metric-card {{ width:25%; padding:12px; border:1px solid #e3d7c8; border-radius:10px; vertical-align:top; }} .metric-card .label {{ color:#806f60; }}
+    .metric-card strong {{ display:block; font-size:16px; margin-top:4px; }} .metric-card small {{ display:block; color:#897b70; margin-top:3px; }}
+    section {{ margin-top:13px; border:1px solid #d5e6d7; border-radius:12px; padding:14px; break-inside:avoid; }} section.sensor {{ border-color:#e7d7c3; }}
+    h2 {{ margin:1px 0 8px; font-size:15px; }} .section-number {{ color:#287343; font-weight:700; font-size:10px; }} .summary {{ color:#5f554b; margin:0 0 10px; }}
+    .mini td {{ width:33%; background:#f7faf7; border-radius:8px; padding:9px; vertical-align:top; }} .mini strong {{ display:block; font-size:13px; margin-top:2px; }}
+    .data-table {{ border:1px solid #eadfd3; border-radius:8px; overflow:hidden; }} .data-table th {{ text-align:left; background:#f8f4ee; padding:7px; color:#705e4d; }} .data-table td {{ padding:7px; border-top:1px solid #eee5db; }} .empty {{ color:#887c70; text-align:center; }}
+    footer {{ margin-top:14px; color:#8a7d71; font-size:8px; }}
+    </style></head><body><header><div class='eyebrow'>COWOW 축사 운영 리포트</div><h1>{report_day} 환경 · 이상행동 보고서</h1><p class='sub'>ESP32가 연결된 기간 동안 누적한 센서 · 제어 · 이상행동 이력을 기반으로 작성되었습니다.</p><span class='period'>보고 기간 {period}</span></header>
+    <table class='cards'><tr>{card('수집 데이터', f"{report['sample_count']}건", '최근 7일 센서 이력')}{card('온도 평균', metric(report['temperature']['average'], '°C'), f"최저 {metric(report['temperature']['min'], '°C')} · 최고 {metric(report['temperature']['max'], '°C')}")}{card('습도 평균', metric(report['humidity']['average'], '%'), f"최저 {metric(report['humidity']['min'], '%')} · 최고 {metric(report['humidity']['max'], '%')}")}{card('공기질 평균', metric(report['air_quality']['average'], '%'), f"최저 {metric(report['air_quality']['min'], '%')} · 최고 {metric(report['air_quality']['max'], '%')}")}</tr></table>
+    <section><div class='section-number'>01 · 종합 판단</div><h2>오늘의 축사 운영 요약</h2><p class='summary'>센서 수치와 이상행동 이력을 함께 확인해 현장 점검과 장비 운전 상태를 판단하세요.</p><table class='mini'><tr><td>개체 관찰<strong>{'우선 점검' if report['anomalies'] else '정상 관찰'}</strong></td><td>환기 · 냉각<strong>{'운전 이력 확인' if report['controls'] else '현재 유지'}</strong></td><td>추가 설비 판단<strong>이력 추적</strong></td></tr></table></section>
+    <section class='sensor'><div class='section-number'>02 · 환경 이력</div><h2>최근 7일 센서 추세와 설비 판단</h2><table class='data-table'><tr><th>항목</th><th>평균</th><th>최저</th><th>최고</th></tr><tr><td>온도</td><td>{metric(report['temperature']['average'], '°C')}</td><td>{metric(report['temperature']['min'], '°C')}</td><td>{metric(report['temperature']['max'], '°C')}</td></tr><tr><td>습도</td><td>{metric(report['humidity']['average'], '%')}</td><td>{metric(report['humidity']['min'], '%')}</td><td>{metric(report['humidity']['max'], '%')}</td></tr><tr><td>공기질</td><td>{metric(report['air_quality']['average'], '%')}</td><td>{metric(report['air_quality']['min'], '%')}</td><td>{metric(report['air_quality']['max'], '%')}</td></tr></table></section>
+    <section><div class='section-number'>03 · 장비 제어</div><h2>환기 · 살수 장비 가동 이력</h2><table class='data-table'><tr><th>장비</th><th>명령 횟수</th><th>가동 추정 시간</th></tr>{control_rows}</table></section>
+    <section><div class='section-number'>04 · 개체 이상행동</div><h2>확인 필요한 개체 및 증상</h2><table class='data-table'><tr><th>개체</th><th>증상</th><th>위험도</th><th>횟수</th></tr>{anomaly_rows}</table></section>
+    <footer>COWOW · 본 보고서는 저장된 센서 이력과 완료된 제어 명령을 기준으로 생성되었습니다. 상세 내용은 {html.escape(FRONTEND_URL)}/dashboard 에서 확인할 수 있습니다.</footer></body></html>"""
+
+
 def report_pdf(owner_name, report):
-    """Create an A4 PDF with an embedded Korean font for mobile viewers."""
-    if PDF_FONT_NAME not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(PDF_FONT_NAME, PDF_FONT_PATH))
-
-    buffer = BytesIO()
-    document = canvas.Canvas(buffer, pagesize=A4, pageCompression=1)
-    document.setTitle("COWOW 축사 운영 보고서")
-    width, height = A4
-    y = height - 52
-
-    for index, line in enumerate(_pdf_lines(owner_name, report)):
-        font_size = 18 if index == 0 else 10
-        line_height = 28 if index == 0 else 17
-        if y < 52:
-            document.showPage()
-            y = height - 52
-        document.setFont(PDF_FONT_NAME, font_size)
-        document.drawString(48, y, line)
-        y -= line_height
-
-    document.save()
-    return buffer.getvalue()
+    """Render the dashboard-style report using a browser-grade HTML engine."""
+    return HTML(string=report_pdf_html(owner_name, report), base_url="/").write_pdf()
 
 
 def send_report(recipient, owner_name, report):
