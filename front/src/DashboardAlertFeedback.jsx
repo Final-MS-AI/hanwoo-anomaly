@@ -100,7 +100,7 @@ function DashboardAlertFeedback({ cattle }) {
           setSubmitState("idle");
         }}
       >
-        {isOpen ? "신고 닫기" : "AI 판단이 잘못됐어요"}
+        {isOpen ? "신고 닫기" : "오류 신고"}
       </button>
 
       {isOpen && (

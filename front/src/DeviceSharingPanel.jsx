@@ -135,10 +135,10 @@ function DeviceSharingPanel({ device }) {
         onClick={() => setIsOpen((previous) => !previous)}
       >
         <span>
-          <strong>가족과 장비 공유</strong>
-          <small>이메일 인증으로 센서 확인과 제어 권한을 공유합니다.</small>
+          <strong>구성원과 장비 공유</strong>
+          <small>이메일 인증으로 직원·가족 등 구성원에게 센서 확인과 제어 권한을 공유합니다.</small>
         </span>
-        <b>{isOpen ? "접기 ▲" : "공유하기 ›"}</b>
+        <b>{isOpen ? "접기 ▲" : "구성원 추가 ›"}</b>
       </button>
 
       {isOpen && (

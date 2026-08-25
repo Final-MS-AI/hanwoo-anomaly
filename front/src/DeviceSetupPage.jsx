@@ -262,7 +262,7 @@ function DeviceSetupPage({ user }) {
       const data = await readApiResponse(response);
 
       if (!response.ok) {
-        throw new Error(data.detail ?? "가족 공유 장비 연결에 실패했습니다.");
+        throw new Error(data.detail ?? "구성원 공유 장비 연결에 실패했습니다.");
       }
 
       localStorage.removeItem(DEVICE_STORAGE_KEY);
@@ -336,7 +336,7 @@ function DeviceSetupPage({ user }) {
               setMessage("");
             }}
           >
-            가족 공유 참여
+            구성원 공유 참여
           </button>
         </div>
       )}
@@ -349,7 +349,7 @@ function DeviceSetupPage({ user }) {
           </div>
 
           <label>
-            <span>가족 공유 인증 코드</span>
+            <span>구성원 공유 인증 코드</span>
             <input
               value={shareCode}
               placeholder="예: F7K2-M9Q4"
