@@ -10,10 +10,15 @@ import html
 import os
 import smtplib
 import textwrap
+from io import BytesIO
 from datetime import date, datetime, timedelta, timezone
 from email.message import EmailMessage
 
 from dotenv import load_dotenv
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 # The FastAPI service keeps secrets outside the repository. Load it before
 # importing device_claim_api, which reads DATABASE_URL at import time.
@@ -26,6 +31,11 @@ from operations_report_api import control_durations, ensure_schema, number, wind
 DEVICE_ID = os.getenv("ESP32_PHYSICAL_DEVICE_ID", "ESP32-01")
 REPORT_DAYS = max(1, min(31, int(os.getenv("REPORT_EMAIL_DAYS", "7"))))
 FRONTEND_URL = os.getenv("FRONTEND_URL", "https://hanwoo.koreacentral.cloudapp.azure.com").rstrip("/")
+PDF_FONT_NAME = "COWOWNanumGothic"
+PDF_FONT_PATH = os.getenv(
+    "COWOW_REPORT_FONT_PATH",
+    "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+)
 
 
 def ensure_delivery_schema(connection):
@@ -223,6 +233,31 @@ def report_pdf(owner_name, report):
     output.extend(b"".join(f"{offset:010d} 00000 n \n".encode("ascii") for offset in offsets[1:]))
     output.extend(f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF\n".encode("ascii"))
     return bytes(output)
+
+
+def report_pdf(owner_name, report):
+    """Create an A4 PDF with an embedded Korean font for mobile viewers."""
+    if PDF_FONT_NAME not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont(PDF_FONT_NAME, PDF_FONT_PATH))
+
+    buffer = BytesIO()
+    document = canvas.Canvas(buffer, pagesize=A4, pageCompression=1)
+    document.setTitle("COWOW 축사 운영 보고서")
+    width, height = A4
+    y = height - 52
+
+    for index, line in enumerate(_pdf_lines(owner_name, report)):
+        font_size = 18 if index == 0 else 10
+        line_height = 28 if index == 0 else 17
+        if y < 52:
+            document.showPage()
+            y = height - 52
+        document.setFont(PDF_FONT_NAME, font_size)
+        document.drawString(48, y, line)
+        y -= line_height
+
+    document.save()
+    return buffer.getvalue()
 
 
 def send_report(recipient, owner_name, report):
