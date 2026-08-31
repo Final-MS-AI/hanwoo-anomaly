@@ -22,11 +22,22 @@ function formatDate(value) {
   }).format(date);
 }
 
+function formatAnalysisDateLabel(value) {
+  if (!value) return "-";
+  const date = new Date(`${value}T00:00:00+09:00`);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "long",
+    day: "numeric",
+    timeZone: "Asia/Seoul",
+  }).format(date);
+}
+
 function recommendationFor(sensors, cattle) {
   const temperature = Number(sensors?.temperature);
   const humidity = Number(sensors?.humidity);
   const airQuality = Number(sensors?.airQuality);
-  const dangerCount = cattle.filter((item) => item.status === "danger").length;
+  const warningCount = cattle.filter((item) => item.status === "warning").length;
 
   const items = [];
   if (temperature >= 32) {
@@ -40,11 +51,11 @@ function recommendationFor(sensors, cattle) {
   if (airQuality >= 55) {
     items.push("공기질 수치가 주의 범위입니다. 팬 용량·환기구 막힘·축사 밀집도를 점검하세요.");
   }
-  if (dangerCount > 0) {
-    items.push(`위험 개체 ${dangerCount}마리는 대표 이미지·감지 영상을 확인하고 개체별 관찰 기록을 남기세요.`);
+  if (warningCount > 0) {
+    items.push(`주의 개체 ${warningCount}마리는 행동 변화 원인과 현장 상태를 함께 확인하고 개체별 관찰 기록을 남기세요.`);
   }
   if (!items.length) {
-    items.push("현재 수집된 환경값은 정상 범위입니다. 이상행동 재발 여부와 환경 이력을 계속 관찰하세요.");
+    items.push("현재 수집된 환경값은 정상 범위입니다. 개체별 행동 변화와 환경 이력을 계속 관찰하세요.");
   }
   return items;
 }
@@ -52,7 +63,7 @@ function recommendationFor(sensors, cattle) {
 function sensorStatus(value, warning, danger) {
   const numeric = Number(value);
   if (!Number.isFinite(numeric)) return { label: "수집 대기", level: "pending" };
-  if (numeric >= danger) return { label: "위험", level: "danger" };
+  if (numeric >= danger) return { label: "주의", level: "warning" };
   if (numeric >= warning) return { label: "주의", level: "warning" };
   return { label: "정상", level: "normal" };
 }
@@ -66,6 +77,39 @@ function formatDuration(seconds) {
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   return hours ? `${hours}시간 ${minutes}분` : `${minutes}분`;
+}
+
+function attentionMetric(item, key) {
+  return item?.metrics?.find((metric) => metric.key === key) || null;
+}
+
+function formatAttentionChange(value) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return "-";
+  if (numeric === 0) return "변화 없음";
+  return `${numeric < 0 ? "감소" : "증가"} ${Math.abs(numeric).toFixed(1)}%`;
+}
+
+function attentionReason(item) {
+  const feedBunk = attentionMetric(item, "feed_bunk");
+  const lying = attentionMetric(item, "lying");
+  const reasons = [];
+  if (feedBunk?.is_warning_metric) reasons.push(`급이대 체류 ${formatAttentionChange(feedBunk.change_ratio_percent)}`);
+  if (lying?.is_warning_metric) reasons.push(`누움 ${formatAttentionChange(lying.change_ratio_percent)}`);
+  return reasons.length ? reasons.join(" · ") : item?.behavior || "주의 행동 변화";
+}
+
+function attentionComparison(item) {
+  const metrics = [attentionMetric(item, "feed_bunk"), attentionMetric(item, "lying")].filter(
+    (metric) => metric?.is_warning_metric,
+  );
+  if (!metrics.length) return "";
+  return metrics
+    .map(
+      (metric) =>
+        `${metric.label} 분석일 ${formatMetric(metric.current_ratio_percent, "%")} · 최근 평균 ${formatMetric(metric.baseline_ratio_percent, "%")}`,
+    )
+    .join(" / ");
 }
 
 function actuatorName(value) {
@@ -162,7 +206,7 @@ const GUEST_REPORT_DATA = {
   ],
 };
 
-function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest = false }) {
+function BarnOperationsReport({ open, onClose, cattle = [], analysisDate = null, updatedAt, isGuest = false }) {
   const [deviceState, setDeviceState] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [loadError, setLoadError] = useState("");
@@ -272,8 +316,16 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
   const temperatureStatus = sensorStatus(hasHistory ? periodSensors.temperature?.max : sensors.temperature, 28, 32);
   const humidityStatus = sensorStatus(hasHistory ? periodSensors.humidity?.max : sensors.humidity, 75, 85);
   const airStatus = sensorStatus(hasHistory ? periodSensors.airQuality?.max : sensors.airQuality, 55, 75);
-  const priorityCattle = groupedCattle.filter((item) => item.status === "danger" || item.status === "warning");
-  const hasEnvironmentalRisk = [temperatureStatus, humidityStatus, airStatus].some((item) => item.level === "danger" || item.level === "warning");
+  const priorityCattle = groupedCattle.filter((item) => item.status === "warning");
+  const insufficientCattle = groupedCattle.filter((item) => item.status === "insufficient");
+  const missingAnalysisCattle = insufficientCattle.filter((item) => item.source === "missing");
+  const baselineCollectingCattle = insufficientCattle.filter(
+    (item) => item.source !== "missing" && item.isBaselineCollecting,
+  );
+  const insufficientDataCattle = insufficientCattle.filter(
+    (item) => item.source !== "missing" && !item.isBaselineCollecting,
+  );
+  const hasEnvironmentalRisk = [temperatureStatus, humidityStatus, airStatus].some((item) => item.level === "warning");
   const reportDevice = reportData?.device;
   const deviceOnline = reportDevice?.online ?? deviceState?.online;
   const lastDeviceSeenAt = reportDevice?.lastSeenAt ?? deviceState?.lastSeenAt;
@@ -284,9 +336,12 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
       <article className="operations-report" onClick={(event) => event.stopPropagation()}>
         <header className="operations-report-header">
           <div>
-            <span> COWOW 축사 운영 리포트</span>
-            <h2>{titleDate} 환경·이상행동 보고서</h2>
-            <p>ESP32가 연결된 기간 동안 누적한 센서·제어·이상행동 이력을 기반으로 작성되었습니다.</p>
+            <div className="report-title-kicker">
+              <span>COWOW 축사 운영 리포트</span>
+              {isGuest && <span className="dashboard-demo-badge">예시 데이터</span>}
+            </div>
+            <h2>{titleDate} 환경·행동 변화 보고서</h2>
+            <p>최근 7일 환경·장비 이력과 최신 완료 일별 행동 변화 분석을 함께 정리했습니다.</p>
           </div>
           <div className="operations-report-actions">
             <button type="button" onClick={printReport}>인쇄 / PDF 저장</button>
@@ -295,8 +350,8 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
         </header>
 
         <section className="report-overview">
-          <div><span>위험 개체</span><strong>{groupedCattle.filter((item) => item.status === "danger").length}마리</strong></div>
-          <div><span>주의 개체</span><strong>{groupedCattle.filter((item) => item.status === "warning").length}마리</strong></div>
+          <div><span>주의 개체</span><strong>{priorityCattle.length}마리</strong></div>
+          <div><span>분석 데이터 부족</span><strong>{insufficientCattle.length}마리</strong></div>
           <div><span>장비 상태</span><strong className={deviceOnline ? "report-ok" : "report-caution"}>{deviceOnline ? "온라인" : "통신 확인 중"}</strong><small>{lastDeviceSeenAt ? `최근 통신 ${formatDate(lastDeviceSeenAt)}` : "최근 통신 정보 없음"}</small></div>
           <div><span>기준 시각</span><strong>{formatDate(updatedAt)}</strong></div>
         </section>
@@ -310,14 +365,14 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
           </div>
           <p>
             {priorityCattle.length
-              ? `현재 ${priorityCattle.length}마리에서 확인이 필요한 이상행동이 감지되었습니다. 가장 최근 알림과 대표 이미지·감지 영상을 우선 확인하세요. `
-              : "현재 활성 이상행동 경보는 없습니다. "}
+              ? `최신 행동 변화 분석에서 ${priorityCattle.length}마리가 주의로 분류되었습니다. 상세 분석의 분석일 값과 최근 평균을 현장 상태와 함께 확인하세요. `
+              : "최신 행동 변화 분석에서 주의로 분류된 개체는 없습니다. "}
             {hasEnvironmentalRisk
               ? "환경 수치 중 주의 이상 항목이 있어 환기·냉각 운전 상태를 함께 확인해야 합니다."
               : "현재 수집된 환경 센서값은 설정한 주의 기준 이내입니다."}
           </p>
           <div className="report-decision-grid">
-            <div><span>개체 관찰</span><strong>{priorityCattle.length ? "우선 점검" : "정상 관찰"}</strong><small>{priorityCattle.length ? "이상행동 영상·현장 상태 대조" : "다음 분석 결과까지 모니터링"}</small></div>
+            <div><span>개체 관찰</span><strong>{priorityCattle.length ? "우선 점검" : "정상 관찰"}</strong><small>{priorityCattle.length ? "행동 변화 원인·현장 상태 대조" : "다음 일별 분석까지 모니터링"}</small></div>
             <div><span>환기·냉각</span><strong>{hasEnvironmentalRisk ? "운전 점검" : "현재 유지"}</strong><small>{hasEnvironmentalRisk ? "센서 추세와 팬 반응 확인" : "정상 범위 유지"}</small></div>
             <div><span>추가 설비 판단</span><strong>{facilityDecision.title}</strong><small>{facilityDecision.detail}</small></div>
           </div>
@@ -347,19 +402,47 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
         </section>
 
         <section className="report-section">
-          <div className="report-section-heading"><div><span>03 · 개체 이상행동</span><h3>문제 개체 및 반복 관찰</h3></div><small>활성 알림 기준</small></div>
-          {groupedCattle.length ? (
+          <div className="report-section-heading"><div><span>03 · 행동 변화 분석</span><h3>주의 개체의 분석일 값과 최근 평균 비교</h3></div><small>{analysisDate ? `행동 분석일 ${formatAnalysisDateLabel(analysisDate)}` : "최신 완료 일별 분석"}</small></div>
+          {priorityCattle.length ? (
             <div className="report-cattle-list">
-              {groupedCattle.map((item) => (
-                <div key={item.cattleId} className={`report-cattle-item ${item.status}`}>
+              {priorityCattle.map((item) => (
+                <div key={item.cattleId} className="report-cattle-item warning report-attention-item">
                   <strong>{item.cattleId}</strong>
-                  <span>{item.behavior}</span>
-                  <span>최근 감지 {item.lastDetectedAt || "-"}</span>
-                  <span>{item.durationSeconds ? `${Math.round(item.durationSeconds)}초 연속` : `현재 목록 내 ${item.count}건`}</span>
+                  <span>{attentionReason(item)}</span>
+                  <span>{attentionComparison(item)}</span>
+                  <span>{item.streakDays > 1 ? `주의 · ${item.streakDays}일 연속` : "주의"}</span>
                 </div>
               ))}
             </div>
-          ) : <p className="report-note">현재 확인이 필요한 이상행동 개체가 없습니다.</p>}
+          ) : <p className="report-note">최신 행동 변화 분석에서 주의 개체가 없습니다.</p>}
+          {missingAnalysisCattle.length > 0 && (
+            <p className="report-note">분석 결과 없음 {missingAnalysisCattle.length}마리: 해당 분석일의 분석 결과가 없습니다.</p>
+          )}
+          {baselineCollectingCattle.length > 0 && (
+            <>
+              <p className="report-note">기준 데이터 수집 중 {baselineCollectingCattle.length}마리</p>
+              {baselineCollectingCattle.map((item) => (
+                <p className="report-note" key={`baseline-collecting-${item.cattleId}`}>
+                  {item.cattleId}: 기준 데이터 수집 중 {item.baselineValidDays}일 / {item.baselineRequiredDays}일 · 직전 {item.baselineRequiredDays}개 유효 관찰일 확보 후 정상/주의 판정을 시작합니다.
+                </p>
+              ))}
+            </>
+          )}
+          {insufficientDataCattle.length > 0 && (
+            <>
+              <p className="report-note">분석 데이터 부족 {insufficientDataCattle.length}마리</p>
+              {insufficientDataCattle.map((item) => (
+                <p className="report-note" key={`insufficient-${item.cattleId}`}>
+                  {item.cattleId}: {item.detail || "분석에 필요한 유효 관찰시간이 충분하지 않습니다."}
+                </p>
+              ))}
+            </>
+          )}
+          <div className="report-attention-policy">
+            <strong>주의 판단 기준</strong>
+            <p>대상일을 제외한 직전 10개 유효 관찰일 평균과 비교하며, 급이대 체류비율이 18% 이상 감소하거나 누움비율이 30% 이상 감소하면 주의로 표시합니다.</p>
+            <small>행동 변화를 확인하기 위한 기준이며, 질병 진단 기준은 아닙니다.</small>
+          </div>
         </section>
 
         <section className="report-section report-recommendations">
@@ -367,7 +450,7 @@ function BarnOperationsReport({ open, onClose, cattle = [], updatedAt, isGuest =
           <ul>{recommendations.map((item) => <li key={item}>{item}</li>)}</ul>
           <div className="report-follow-up">
             <strong>다음 보고서에서 자동 검토할 항목</strong>
-            <span>① 고온 발생 시각과 지속시간 ② 팬·살수 명령 및 실제 운전 시간 ③ 제어 후 온도·습도 변화 ④ 동일 개체·증상의 반복 횟수</span>
+            <span>① 고온 발생 시각과 지속시간 ② 팬·살수 명령 및 실제 운전 시간 ③ 제어 후 온도·습도 변화 ④ 동일 개체의 행동 변화 반복 여부</span>
           </div>
         </section>
       </article>

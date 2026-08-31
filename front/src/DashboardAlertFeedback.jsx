@@ -5,19 +5,34 @@ const API_BASE_URL =
   "https://hanwoo.koreacentral.cloudapp.azure.com";
 
 const CORRECTED_LABELS = [
-  ["normal", "정상 행동"],
   ["standing", "서 있음"],
   ["walking", "걷는 중"],
   ["lying", "누워 있음"],
   ["feeding", "섭식 중"],
-  ["ruminating", "반추 중"],
   ["unknown", "판단하기 어려움"],
 ];
 
+function behaviorLabel(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key) return "행동 정보 없음";
+  if (key.includes("standing")) return "서 있음";
+  if (key.includes("lying")) return "누워 있음";
+  if (key.includes("walking")) return "걷는 중";
+  if (
+    key.includes("feeding") ||
+    key.includes("eating") ||
+    key.includes("head_down") ||
+    key.includes("섭식")
+  ) {
+    return "섭식 중";
+  }
+  return value;
+}
+
 function DashboardAlertFeedback({ cattle }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [feedbackType, setFeedbackType] = useState("false_anomaly");
-  const [correctedLabel, setCorrectedLabel] = useState("normal");
+  const [feedbackType, setFeedbackType] = useState("wrong_behavior");
+  const [correctedLabel, setCorrectedLabel] = useState("unknown");
   const [comment, setComment] = useState("");
   const [evidenceImage, setEvidenceImage] = useState(null);
   const [evidenceVideo, setEvidenceVideo] = useState(null);
@@ -107,7 +122,7 @@ function DashboardAlertFeedback({ cattle }) {
         <form className="dashboard-feedback-form" onSubmit={submitFeedback}>
           <div className="dashboard-feedback-context">
             <span>AI 판단</span>
-            <strong>{cattle.behavior}</strong>
+            <strong>{behaviorLabel(cattle.behavior)}</strong>
           </div>
 
           <label>
@@ -116,7 +131,6 @@ function DashboardAlertFeedback({ cattle }) {
               value={feedbackType}
               onChange={(event) => setFeedbackType(event.target.value)}
             >
-              <option value="false_anomaly">정상인데 이상으로 탐지했어요</option>
               <option value="wrong_behavior">행동 종류가 틀렸어요</option>
               <option value="wrong_tracking">다른 소의 결과가 연결됐어요</option>
               <option value="false_detection">소가 아닌 대상을 탐지했어요</option>
