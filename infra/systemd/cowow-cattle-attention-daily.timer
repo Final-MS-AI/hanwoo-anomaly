@@ -1,0 +1,10 @@
+[Unit]
+Description=Run COWOW daily cattle attention analysis at 00:10 KST
+
+[Timer]
+OnCalendar=*-*-* 00:10:00 Asia/Seoul
+Persistent=true
+Unit=cowow-cattle-attention-daily.service
+
+[Install]
+WantedBy=timers.target

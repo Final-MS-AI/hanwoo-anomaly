@@ -1882,3 +1882,425 @@
     display: none;
   }
 }
+
+/* -------------------------------------------------------------
+ * COWOW attention dashboard v4.2 mobile/WebView overrides
+ *
+ * 기존 app-mobile.css 자체를 새로 만든 것이 아니라, 원본 파일을 그대로
+ * 유지하고 마지막에 이 대시보드 전용 override 한 블록만 추가한다.
+ * main.jsx에서 app-mobile.css가 컴포넌트 CSS보다 뒤에 로드되므로
+ * 기존 구형 대시보드 모바일 규칙(4열 KPI 등)을 여기서 최종 보정한다.
+ * ------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .abnormal-dashboard {
+    margin-bottom: 118px;
+  }
+
+  .abnormal-dashboard .abnormal-dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .abnormal-dashboard .dashboard-header-actions {
+    width: 100%;
+  }
+
+  .abnormal-dashboard .dashboard-report-button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .abnormal-dashboard .dashboard-update-time {
+    display: block !important;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .abnormal-dashboard .dashboard-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    min-width: 0;
+    min-height: 92px;
+    padding: 13px 10px;
+    text-align: left;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    white-space: normal;
+    line-height: 1.35;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card small {
+    display: inline;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+    margin: 12px 0 10px;
+    padding: 4px;
+    border: 1px solid #eadfd4;
+    border-radius: 12px;
+    background: #f8f4ee;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-tabs button {
+    min-height: 42px;
+    border: 0;
+    border-radius: 9px;
+    background: transparent;
+    color: #74675b;
+    font: inherit;
+    font-weight: 700;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-tabs button.active {
+    background: #704b2b;
+    color: #fff;
+  }
+
+  .abnormal-dashboard .dashboard-content-grid.is-open {
+    display: block;
+  }
+
+  .abnormal-dashboard .dashboard-content-grid.is-open > .dashboard-panel.mobile-hidden {
+    display: none;
+  }
+
+  .abnormal-dashboard .dashboard-content-grid.is-open > .dashboard-panel.mobile-active {
+    display: block;
+  }
+
+  .abnormal-dashboard .dashboard-panel {
+    min-width: 0;
+  }
+
+  .abnormal-dashboard .dashboard-filter-buttons {
+    display: flex;
+    width: 100%;
+    flex-wrap: nowrap;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 5px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .abnormal-dashboard .dashboard-filter-buttons::-webkit-scrollbar {
+    display: none;
+  }
+
+  .abnormal-dashboard .dashboard-filter-buttons button {
+    flex: 0 0 auto;
+    min-height: 38px;
+    white-space: nowrap;
+  }
+
+  .abnormal-dashboard .analysis-cattle-body {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .abnormal-dashboard .analysis-cattle-body > .dashboard-outline-button {
+    width: 100%;
+    align-self: stretch;
+  }
+
+  .abnormal-dashboard .recent-behavior-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .abnormal-dashboard .recent-behavior-actions > .dashboard-alert-feedback {
+    display: block;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  .abnormal-dashboard .recent-behavior-actions .dashboard-outline-button,
+  .abnormal-dashboard .recent-behavior-actions .dashboard-feedback-trigger {
+    width: 100%;
+    min-width: 0;
+    white-space: normal;
+    text-align: center;
+  }
+}
+
+@media (max-width: 420px) {
+  .abnormal-dashboard {
+    width: calc(100% - 16px);
+    padding: 16px;
+  }
+
+  .abnormal-dashboard .dashboard-filter-buttons button {
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 360px) {
+  .abnormal-dashboard .dashboard-update-time {
+    display: block !important;
+  }
+}
+
+/* COWOW dashboard v4.2 final refresh override. */
+@media (max-width: 640px) {
+  .abnormal-dashboard .desktop-update-time,
+  .abnormal-dashboard .dashboard-header-refresh {
+    display: none !important;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-refresh {
+    display: block !important;
+    width: 100%;
+  }
+}
+
+/* -------------------------------------------------------------
+ * COWOW dashboard v4.3 mobile/WebView refinements (2026-08-27)
+ * - compact 1 x 4 KPI row
+ * - keep team-authored feedback wording on one line
+ * - use the same refresh control as desktop
+ * ------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .abnormal-dashboard .dashboard-summary-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 6px !important;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    min-width: 0;
+    min-height: 72px;
+    padding: 10px 5px;
+    text-align: center;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    min-height: 24px;
+    margin-bottom: 7px;
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: normal;
+    word-break: keep-all;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > div {
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 24px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card small {
+    font-size: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-refresh-group,
+  .abnormal-dashboard .dashboard-refresh-button {
+    width: 100%;
+  }
+
+  .abnormal-dashboard .recent-behavior-actions .dashboard-feedback-trigger {
+    padding-right: 7px;
+    padding-left: 7px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .abnormal-dashboard .dashboard-summary-grid {
+    gap: 4px !important;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    padding-right: 3px;
+    padding-left: 3px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    font-size: 8.5px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 22px;
+  }
+}
+
+
+/* COWOW dashboard v4.4 small-screen safeguards. */
+@media (max-width: 390px) {
+  .abnormal-dashboard .dashboard-summary-card > span {
+    font-size: 8.5px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 22px;
+  }
+
+  .abnormal-dashboard .recent-behavior-actions .dashboard-feedback-trigger {
+    min-width: 0;
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 10.5px;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 340px) {
+  .abnormal-dashboard .dashboard-summary-grid {
+    gap: 3px !important;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    min-height: 68px;
+    padding-right: 2px;
+    padding-left: 2px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    font-size: 7.8px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 20px;
+  }
+}
+
+
+/* -------------------------------------------------------------
+ * COWOW dashboard v4.7 mobile/WebView visual refinements (2026-08-27)
+ * - make the four KPI cards slightly more prominent
+ * - de-emphasize utility actions/tabs without changing layout
+ * - reduce avoidable subtitle wrapping on normal phone widths
+ * ------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .abnormal-dashboard .abnormal-dashboard-header p {
+    font-size: 11.5px;
+    line-height: 1.4;
+    letter-spacing: -0.025em;
+    word-break: keep-all;
+  }
+
+  .abnormal-dashboard .dashboard-report-button {
+    min-height: 38px;
+    padding: 8px 13px;
+    font-size: 11.5px;
+  }
+
+  .abnormal-dashboard .dashboard-refresh-button {
+    min-height: 36px;
+    padding: 7px 10px;
+    font-size: 11px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    min-height: 82px;
+    padding: 12px 5px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    min-height: 25px;
+    margin-bottom: 8px;
+    font-size: 9.2px;
+    line-height: 1.3;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 26px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card small {
+    font-size: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-details-button {
+    width: 100%;
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 11px;
+    line-height: 1.15;
+    border-radius: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-details-button span {
+    font-size: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-tabs {
+    margin-top: 10px;
+    margin-bottom: 9px;
+    padding: 3px;
+  }
+
+  .abnormal-dashboard .dashboard-mobile-tabs button {
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 11.5px;
+  }
+
+  .abnormal-dashboard .dashboard-panel-heading p {
+    font-size: 11px;
+    line-height: 1.4;
+    letter-spacing: -0.02em;
+    word-break: keep-all;
+  }
+}
+
+@media (max-width: 390px) {
+  .abnormal-dashboard .dashboard-summary-card > span {
+    font-size: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 25px;
+  }
+}
+
+@media (max-width: 340px) {
+  .abnormal-dashboard .abnormal-dashboard-header p,
+  .abnormal-dashboard .dashboard-panel-heading p {
+    font-size: 10.5px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card {
+    min-height: 76px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card > span {
+    font-size: 8px;
+  }
+
+  .abnormal-dashboard .dashboard-summary-card strong {
+    font-size: 23px;
+  }
+}
+
+/* COWOW v4.7 rev3: mobile details toggle — wide and thin. */
+@media (max-width: 640px) {
+  .abnormal-dashboard .dashboard-priority-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .abnormal-dashboard .dashboard-details-button {
+    width: 100%;
+    height: 32px;
+    min-height: 32px;
+    padding: 0 12px;
+    font-size: 11px;
+    line-height: 1;
+    border-radius: 9px;
+  }
+
+  .abnormal-dashboard .dashboard-details-button span {
+    font-size: 9px;
+  }
+}
