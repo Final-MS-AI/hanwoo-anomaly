@@ -89,7 +89,9 @@ function BarnEnvironmentControl({ user }) {
   const [isDeviceOnline, setIsDeviceOnline] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState(null);
   const [mode, setMode] = useState("auto");
-  const [fanLevel, setFanLevel] = useState(2);
+  // The physical fan is relay-controlled, so it supports ON/OFF only.
+  // Keep 0/1 values for compatibility with the existing device command API.
+  const [fanLevel, setFanLevel] = useState(0);
   const [isSpraying, setIsSpraying] = useState(false);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
@@ -240,22 +242,25 @@ function BarnEnvironmentControl({ user }) {
   useEffect(() => {
     if (mode !== "auto" || !device?.deviceId) return undefined;
 
-    const recommendedLevel =
-      sensors.airQuality >= 75 || sensors.temperature >= 32
-        ? 3
-        : sensors.airQuality >= 55 || sensors.temperature >= 28
-          ? 2
-          : 1;
+    const shouldRunFan =
+      sensors.airQuality >= 55 || sensors.temperature >= 28;
+    const fanCommand = shouldRunFan ? 1 : 0;
 
     let isCancelled = false;
-    setFanLevel(recommendedLevel);
-    setControlMessage(`환기팬 ${recommendedLevel}단계 명령을 전송하는 중입니다.`);
+    setFanLevel(fanCommand);
+    setControlMessage(
+      shouldRunFan
+        ? "센서 기준으로 환기팬 ON 명령을 전송하는 중입니다."
+        : "센서 기준으로 환기팬 OFF 명령을 전송하는 중입니다.",
+    );
 
-    sendControlCommand("ventilation_fan", recommendedLevel)
+    sendControlCommand("ventilation_fan", fanCommand)
       .then(() => {
         if (!isCancelled) {
           setControlMessage(
-            `센서 기준으로 환기팬 ${recommendedLevel}단계를 자동 유지합니다.`,
+            shouldRunFan
+              ? "센서 기준으로 환기팬을 자동 운전합니다."
+              : "센서 기준으로 환기팬을 자동 정지했습니다.",
           );
         }
       })
@@ -274,13 +279,16 @@ function BarnEnvironmentControl({ user }) {
     sensors.temperature,
   ]);
 
-  const changeFanLevel = async (level) => {
+  const changeFanState = async (nextState) => {
     if (mode === "auto") return;
 
     try {
-      await sendControlCommand("ventilation_fan", level);
-      setFanLevel(level);
-      setControlMessage(level === 0 ? "환기팬을 정지했습니다." : `환기팬을 ${level}단계로 운전합니다.`);
+      const fanCommand = nextState ? 1 : 0;
+      await sendControlCommand("ventilation_fan", fanCommand);
+      setFanLevel(fanCommand);
+      setControlMessage(
+        nextState ? "환기팬을 켰습니다." : "환기팬을 껐습니다.",
+      );
     } catch (error) {
       setControlMessage(error.message);
     }
@@ -476,7 +484,7 @@ function BarnEnvironmentControl({ user }) {
         <span>
           <strong>팬·살수 장비 제어</strong>
           <small>
-            {mode === "auto" ? "자동" : "수동"} · 팬 {fanLevel === 0 ? "정지" : `${fanLevel}단`} · {isSpraying ? "살수 중" : "살수 대기"}
+            {mode === "auto" ? "자동" : "수동"} · 팬 {fanLevel > 0 ? "ON" : "OFF"} · {isSpraying ? "살수 중" : "살수 대기"}
           </small>
         </span>
         <b>{isControlsOpen ? "접기 ▲" : "제어 열기 ›"}</b>
@@ -505,21 +513,26 @@ function BarnEnvironmentControl({ user }) {
                 <h3>환기팬</h3>
               </div>
               <span className={`device-status ${fanLevel > 0 ? "on" : "off"}`}>
-                {fanLevel > 0 ? `운전 ${fanLevel}단계` : "정지"}
+                {fanLevel > 0 ? "ON" : "OFF"}
               </span>
             </div>
-            <div className="fan-level-buttons" role="group" aria-label="환기팬 단계">
-              {[0, 1, 2, 3].map((level) => (
-                <button
-                  className={fanLevel === level ? "active" : ""}
-                  type="button"
-                  key={level}
-                  disabled={mode === "auto"}
-                  onClick={() => changeFanLevel(level)}
-                >
-                  {level === 0 ? "정지" : `${level}단`}
-                </button>
-              ))}
+            <div className="fan-level-buttons" role="group" aria-label="환기팬 전원">
+              <button
+                className={fanLevel > 0 ? "active" : ""}
+                type="button"
+                disabled={mode === "auto"}
+                onClick={() => changeFanState(true)}
+              >
+                팬 켜기
+              </button>
+              <button
+                className={fanLevel === 0 ? "active" : ""}
+                type="button"
+                disabled={mode === "auto"}
+                onClick={() => changeFanState(false)}
+              >
+                팬 끄기
+              </button>
             </div>
             {mode === "auto" && <p className="auto-control-hint">수동 조작은 수동 모드에서 사용할 수 있습니다.</p>}
           </article>
