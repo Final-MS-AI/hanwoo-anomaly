@@ -102,12 +102,12 @@ function behaviorLabel(value) {
   const key = String(value || "").trim().toLowerCase();
   if (!key) return "행동 정보 없음";
   if (key.includes("standing")) return "서 있음";
+  if (key.includes("head_down")) return "서 있음";
   if (key.includes("lying")) return "누워 있음";
   if (key.includes("walking")) return "걷는 중";
   if (
     key.includes("feeding") ||
     key.includes("eating") ||
-    key.includes("head_down") ||
     key.includes("섭식")
   ) {
     return "섭식 중";
@@ -254,7 +254,7 @@ function StatusBadge({ cattle }) {
   return <span className="analysis-status-badge normal">이상 징후 없음</span>;
 }
 
-function RecentBehaviorCard({ cattle, onOpenVideo, isGuest = false }) {
+function RecentBehaviorCard({ cattle, onOpenImage, onOpenVideo, isGuest = false }) {
   return (
     <article className="recent-behavior-card">
       <div className="recent-behavior-top">
@@ -262,34 +262,44 @@ function RecentBehaviorCard({ cattle, onOpenVideo, isGuest = false }) {
         {!isGuest && <time>{cattle.lastDetectedAt}</time>}
       </div>
       <p><span>{isGuest ? "예시 행동 :" : "최근 감지 행동 :"}</span> {cattle.behaviorLabel}</p>
-      {!isGuest && <div className="recent-behavior-actions">
-        {cattle.imageUrl ? (
-          <a
-            href={cattle.imageUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="dashboard-outline-button"
-          >
-            대표 이미지
-          </a>
-        ) : (
-          <button type="button" className="dashboard-outline-button" disabled>
-            대표 이미지
-          </button>
-        )}
-        <button
-          className="dashboard-outline-button"
-          type="button"
-          disabled={!cattle.videoUrl}
-          onClick={() =>
-            cattle.videoUrl &&
-            onOpenVideo({ url: cattle.videoUrl, label: `${cattle.cattleId} 감지 영상` })
-          }
-        >
-          감지 영상
-        </button>
-        <DashboardAlertFeedback cattle={cattle} />
-      </div>}
+      {!isGuest && (
+        <>
+          <div className="recent-behavior-actions">
+            {cattle.imageUrl ? (
+              <button
+                type="button"
+                className="dashboard-outline-button"
+                onClick={() =>
+                  onOpenImage({ url: cattle.imageUrl, label: `${cattle.cattleId} 대표 이미지` })
+                }
+              >
+                대표 이미지
+              </button>
+            ) : (
+              <button type="button" className="dashboard-outline-button" disabled>
+                대표 이미지
+              </button>
+            )}
+            <button
+              className="dashboard-outline-button"
+              type="button"
+              disabled={!cattle.videoUrl}
+              onClick={() =>
+                cattle.videoUrl &&
+                onOpenVideo({ url: cattle.videoUrl, label: `${cattle.cattleId} 감지 영상` })
+              }
+            >
+              감지 영상
+            </button>
+            <DashboardAlertFeedback cattle={cattle} />
+          </div>
+          {cattle.videoUrl && (
+            <small className="recent-behavior-video-note">
+              감지 영상은 행동이 감지된 시점 전후의 짧은 영상입니다. 영상 전체 구간에서 같은 행동이 지속된다는 의미는 아닙니다.
+            </small>
+          )}
+        </>
+      )}
     </article>
   );
 }
@@ -310,6 +320,7 @@ function AbnormalCattleDashboard({ user }) {
   const [updatedAt, setUpdatedAt] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [activeImage, setActiveImage] = useState(null);
   const [activeVideo, setActiveVideo] = useState(null);
   const [activeAnalysis, setActiveAnalysis] = useState(null);
   const [isReportOpen, setIsReportOpen] = useState(false);
@@ -464,7 +475,15 @@ function AbnormalCattleDashboard({ user }) {
     ) || null;
   }, [recentBehavior, selectedCattle]);
 
+  const hasRecentBehavior = (cattle) =>
+    recentBehavior.some(
+      (item) =>
+        (cattle.nationalId && item.nationalId === cattle.nationalId) ||
+        item.cattleId === cattle.cattleId,
+    );
+
   const showCurrentState = (cattle) => {
+    if (!hasRecentBehavior(cattle)) return;
     setSelectedCattle(cattle);
     setIsDetailsOpen(true);
     setMobilePanel("recent");
@@ -645,16 +664,18 @@ function AbnormalCattleDashboard({ user }) {
               </div>
             )}
 
-            {pagedAnalysis.map((cattle) => (
+            {pagedAnalysis.map((cattle) => {
+              const canShowCurrentState = hasRecentBehavior(cattle);
+              return (
               <article
-                className={`analysis-cattle-card ${cattle.status} ${cattle.isBaselineCollecting ? "collecting" : ""} ${cattle.status === "warning" ? "selectable" : ""}`}
+                className={`analysis-cattle-card ${cattle.status} ${cattle.isBaselineCollecting ? "collecting" : ""} ${canShowCurrentState ? "selectable" : ""}`}
                 key={cattle.id}
-                role={cattle.status === "warning" ? "button" : undefined}
-                tabIndex={cattle.status === "warning" ? 0 : undefined}
-                onClick={() => cattle.status === "warning" && showCurrentState(cattle)}
+                role={canShowCurrentState ? "button" : undefined}
+                tabIndex={canShowCurrentState ? 0 : undefined}
+                onClick={() => canShowCurrentState && showCurrentState(cattle)}
                 onKeyDown={(event) => {
                   if (
-                    cattle.status === "warning" &&
+                    canShowCurrentState &&
                     (event.key === "Enter" || event.key === " ")
                   ) {
                     event.preventDefault();
@@ -665,7 +686,7 @@ function AbnormalCattleDashboard({ user }) {
                 <div className="analysis-cattle-top">
                   <strong>{cattle.cattleId}</strong>
                   <StatusBadge cattle={cattle} />
-                  {cattle.status === "warning" && (
+                  {canShowCurrentState && (
                     <span className="analysis-link-hint">현재 상태 보기 →</span>
                   )}
                 </div>
@@ -701,7 +722,8 @@ function AbnormalCattleDashboard({ user }) {
                   </button>
                 </div>
               </article>
-            ))}
+              );
+            })}
           </div>
 
           <Pagination page={analysisPage} totalPages={analysisTotalPages} onChange={setAnalysisPage} />
@@ -733,12 +755,12 @@ function AbnormalCattleDashboard({ user }) {
                 ← 전체 개체 보기
               </button>
               <div className="selected-realtime-title">
-                <span>선택한 주의 개체</span>
+                <span>선택한 개체</span>
                 <strong>{selectedCattle.cattleId}</strong>
                 <StatusBadge cattle={selectedCattle} />
               </div>
               {selectedRecent ? (
-                <RecentBehaviorCard cattle={selectedRecent} onOpenVideo={setActiveVideo} isGuest={isGuest} />
+                <RecentBehaviorCard cattle={selectedRecent} onOpenImage={setActiveImage} onOpenVideo={setActiveVideo} isGuest={isGuest} />
               ) : (
                 <div className="selected-realtime-empty">
                   <strong>표시 가능한 실시간 행동 이벤트가 없습니다.</strong>
@@ -767,6 +789,7 @@ function AbnormalCattleDashboard({ user }) {
                 {pagedRecent.map((cattle) => (
                   <RecentBehaviorCard
                     cattle={cattle}
+                    onOpenImage={setActiveImage}
                     onOpenVideo={setActiveVideo}
                     isGuest={isGuest}
                     key={cattle.id}
@@ -946,6 +969,24 @@ function AbnormalCattleDashboard({ user }) {
               </>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {activeImage && (
+        <div
+          className="dashboard-image-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={activeImage.label}
+          onClick={() => setActiveImage(null)}
+        >
+          <div className="dashboard-image-modal-card" onClick={(event) => event.stopPropagation()}>
+            <div>
+              <strong>{activeImage.label}</strong>
+              <button type="button" onClick={() => setActiveImage(null)}>닫기</button>
+            </div>
+            <img src={activeImage.url} alt={activeImage.label} />
           </div>
         </div>
       )}

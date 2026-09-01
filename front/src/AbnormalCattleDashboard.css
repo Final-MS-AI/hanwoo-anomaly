@@ -535,6 +535,14 @@
   margin-top: 3px;
 }
 
+.recent-behavior-video-note {
+  display: block;
+  margin-top: 8px;
+  color: #8a8179;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
 .dashboard-alert-feedback {
   display: grid;
   gap: 10px;
@@ -657,7 +665,8 @@
 }
 
 .dashboard-analysis-modal,
-.dashboard-video-modal {
+.dashboard-video-modal,
+.dashboard-image-modal {
   position: fixed;
   z-index: 1100;
   inset: 0;
@@ -668,7 +677,8 @@
 }
 
 .dashboard-analysis-modal-card,
-.dashboard-video-modal-card {
+.dashboard-video-modal-card,
+.dashboard-image-modal-card {
   width: min(760px, 100%);
   max-height: calc(100vh - 40px);
   overflow: auto;
@@ -682,7 +692,8 @@
 }
 
 .dashboard-analysis-modal-header,
-.dashboard-video-modal-card > div {
+.dashboard-video-modal-card > div,
+.dashboard-image-modal-card > div {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -711,7 +722,8 @@
 }
 
 .dashboard-analysis-modal-header button,
-.dashboard-video-modal-card button {
+.dashboard-video-modal-card button,
+.dashboard-image-modal-card button {
   padding: 7px 11px;
   border: 1px solid #d8c6ad;
   border-radius: 8px;
@@ -845,12 +857,14 @@
   line-height: 1.55;
 }
 
-.dashboard-video-modal-card {
+.dashboard-video-modal-card,
+.dashboard-image-modal-card {
   width: min(900px, 100%);
   overflow: hidden;
 }
 
-.dashboard-video-modal-card > div {
+.dashboard-video-modal-card > div,
+.dashboard-image-modal-card > div {
   padding: 14px 16px;
   color: #2c2118;
 }
@@ -859,6 +873,14 @@
   display: block;
   width: 100%;
   max-height: min(70vh, 620px);
+  background: #111;
+}
+
+.dashboard-image-modal-card img {
+  display: block;
+  width: 100%;
+  max-height: min(75vh, 720px);
+  object-fit: contain;
   background: #111;
 }
 
