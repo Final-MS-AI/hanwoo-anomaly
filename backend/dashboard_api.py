@@ -364,7 +364,16 @@ def get_dashboard(
                         SELECT a.analysis_date, COUNT(DISTINCT a.cattle_id) AS coverage
                         FROM public.cattle_attention_daily_analysis a
                         JOIN public.cattle c ON c.id = a.cattle_id
-                        WHERE c.user_id = %s
+                        WHERE (
+                            c.user_id = %s
+                            OR c.user_id IN (
+                                SELECT o.user_id
+                                FROM public.device_members m
+                                JOIN public.device_owners o
+                                  ON o.device_id = m.device_id
+                                WHERE m.user_id = %s
+                            )
+                          )
                           AND (
                             COALESCE(c.status, 'active') = 'active'
                             OR (%s = 'guest' AND c.status = 'demo')
@@ -373,7 +382,7 @@ def get_dashboard(
                         ORDER BY a.analysis_date DESC
                         LIMIT 1
                         """,
-                        (user_id, user_provider),
+                        (user_id, user_id, user_provider),
                     )
                     date_row = cursor.fetchone()
                     if date_row:
@@ -450,7 +459,16 @@ def get_dashboard(
                                 d.updated_at DESC, d.id DESC
                             LIMIT 1
                         ) a ON TRUE
-                        WHERE c.user_id = %s
+                        WHERE (
+                            c.user_id = %s
+                            OR c.user_id IN (
+                                SELECT o.user_id
+                                FROM public.device_members m
+                                JOIN public.device_owners o
+                                  ON o.device_id = m.device_id
+                                WHERE m.user_id = %s
+                            )
+                          )
                           AND (
                             COALESCE(c.status, 'active') = 'active'
                             OR (%s = 'guest' AND c.status = 'demo')
@@ -461,6 +479,7 @@ def get_dashboard(
                             latest_analysis_date,
                             BASELINE_REQUIRED_VALID_DAYS,
                             latest_analysis_date,
+                            user_id,
                             user_id,
                             user_provider,
                         ),
@@ -487,14 +506,23 @@ def get_dashboard(
                             'COWOW 왼쪽 일별 분석 결과가 아직 없습니다.'::text,
                             'missing'::text, '[]'::jsonb
                         FROM public.cattle c
-                        WHERE c.user_id = %s
+                        WHERE (
+                            c.user_id = %s
+                            OR c.user_id IN (
+                                SELECT o.user_id
+                                FROM public.device_members m
+                                JOIN public.device_owners o
+                                  ON o.device_id = m.device_id
+                                WHERE m.user_id = %s
+                            )
+                          )
                           AND (
                             COALESCE(c.status, 'active') = 'active'
                             OR (%s = 'guest' AND c.status = 'demo')
                           )
                         ORDER BY c.id
                         """,
-                        (user_id, user_provider),
+                        (user_id, user_id, user_provider),
                     )
                     analysis_rows = cursor.fetchall()
 
@@ -724,6 +752,23 @@ def get_dashboard(
                 "camera_id": None,
             }
             for national_id, behavior in guest_behavior
+        ]
+
+    # 게스트 왼쪽 일별 분석은 COW-001~006만 노출한다.
+    # 기존 guest-demo 60두 DB 데이터는 삭제하거나 변경하지 않는다.
+    if user_provider == "guest":
+        guest_analysis_national_ids = {
+            "990000000001",
+            "990000000002",
+            "990000000003",
+            "990000000004",
+            "990000000005",
+            "990000000006",
+        }
+        analysis_rows = [
+            row
+            for row in analysis_rows
+            if row[2] in guest_analysis_national_ids
         ]
 
     def _ratio_percent(value):
