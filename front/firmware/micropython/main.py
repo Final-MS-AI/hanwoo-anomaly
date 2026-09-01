@@ -169,15 +169,19 @@ def set_humidifier(enabled, duration_seconds=0):
     # 현재 릴레이 기준: HIGH(1) = ON, LOW(0) = OFF
     humidifier_relay.value(1 if water_sprayer_on else 0)
     try:
-        duration_seconds = max(0, int(duration_seconds or 0))
-    except (TypeError, ValueError):
+        duration_seconds = int(duration_seconds)
+    except:
         duration_seconds = 0
 
-    water_sprayer_stop_at = (
-        time.ticks_add(time.ticks_ms(), duration_seconds * 1000)
-        if water_sprayer_on and duration_seconds > 0
-        else None
-    )
+    if duration_seconds < 0:
+        duration_seconds = 0
+
+    if water_sprayer_on and duration_seconds > 0:
+        water_sprayer_stop_at = time.ticks_add(
+            time.ticks_ms(), duration_seconds * 1000
+        )
+    else:
+        water_sprayer_stop_at = None
     print(
         "가습기 릴레이:",
         "ON" if water_sprayer_on else "OFF",
