@@ -60,6 +60,7 @@ class ActuatorRequest(BaseModel):
     deviceId: str = Field(min_length=1, max_length=100)
     actuator: str
     value: int | bool
+    durationSeconds: int = Field(default=0, ge=0, le=14400)
 
 
 def normalize_email(value: str):
@@ -371,6 +372,7 @@ def actuator(body: ActuatorRequest, cowow_session: str | None = Cookie(default=N
             )
             command_id = cursor.fetchone()[0]
         connection.commit()
+    duration_seconds = int(body.durationSeconds or 0)
     request = {
         "methodName": "setActuator",
         "connectTimeoutInSeconds": 5,
@@ -378,6 +380,7 @@ def actuator(body: ActuatorRequest, cowow_session: str | None = Cookie(default=N
         "payload": {
             "actuator": body.actuator,
             "value": int(body.value),
+            "durationSeconds": duration_seconds,
         },
     }
 

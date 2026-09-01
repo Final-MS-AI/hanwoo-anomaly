@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DeviceSharingPanel from "./DeviceSharingPanel.jsx";
 
@@ -34,6 +34,12 @@ const initialSensors = {
   humidity: null,
   airQuality: null,
 };
+
+const MANUAL_DURATION_OPTIONS = [
+  { hours: 1, label: "1시간" },
+  { hours: 2, label: "2시간" },
+  { hours: 4, label: "4시간" },
+];
 
 const sensorDefinitions = [
   {
@@ -89,16 +95,15 @@ function BarnEnvironmentControl({ user }) {
   const [isDeviceOnline, setIsDeviceOnline] = useState(false);
   const [lastSeenAt, setLastSeenAt] = useState(null);
   const [mode, setMode] = useState("auto");
-  // The physical fan is relay-controlled, so it supports ON/OFF only.
-  // Keep 0/1 values for compatibility with the existing device command API.
   const [fanLevel, setFanLevel] = useState(0);
   const [isSpraying, setIsSpraying] = useState(false);
+  const [sprayerDurationHours, setSprayerDurationHours] = useState(1);
+  const [sprayerStopAt, setSprayerStopAt] = useState(null);
   const [isControlsOpen, setIsControlsOpen] = useState(false);
   const [isDisconnecting, setIsDisconnecting] = useState(false);
   const [disconnectError, setDisconnectError] = useState("");
   const [controlMessage, setControlMessage] = useState("자동 환기 운전 중");
   const [activeSystemTab, setActiveSystemTab] = useState("environment");
-  const sprayTimerRef = useRef(null);
 
   const sensorCards = useMemo(
     () =>
@@ -122,6 +127,19 @@ function BarnEnvironmentControl({ user }) {
         second: "2-digit",
       })
     : "확인 중";
+
+  useEffect(() => {
+    if (!sprayerStopAt) return undefined;
+
+    const timer = window.setInterval(() => {
+      if (Date.now() >= sprayerStopAt.getTime()) {
+        setIsSpraying(false);
+        setSprayerStopAt(null);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [sprayerStopAt]);
 
   useEffect(() => {
     if (isGuest) {
@@ -214,11 +232,14 @@ function BarnEnvironmentControl({ user }) {
     return () => {
       isCancelled = true;
       window.clearInterval(sensorTimer);
-      if (sprayTimerRef.current) window.clearTimeout(sprayTimerRef.current);
     };
   }, [device?.deviceId, isGuest]);
 
-  const sendControlCommand = useCallback(async (actuator, value) => {
+  const sendControlCommand = useCallback(async (
+    actuator,
+    value,
+    durationSeconds = 0,
+  ) => {
     if (isGuest) {
       setControlMessage(`${actuator === "ventilation_fan" ? "환기팬" : "살수 장치"} 데모 명령을 적용했습니다.`);
       return;
@@ -233,6 +254,7 @@ function BarnEnvironmentControl({ user }) {
         deviceId: device?.deviceId,
         actuator,
         value,
+        durationSeconds,
       }),
     });
 
@@ -244,7 +266,7 @@ function BarnEnvironmentControl({ user }) {
 
     const shouldRunFan =
       sensors.airQuality >= 55 || sensors.temperature >= 28;
-    const fanCommand = shouldRunFan ? 1 : 0;
+    const fanCommand = shouldRunFan ? 3 : 0;
 
     let isCancelled = false;
     setFanLevel(fanCommand);
@@ -279,44 +301,37 @@ function BarnEnvironmentControl({ user }) {
     sensors.temperature,
   ]);
 
-  const changeFanState = async (nextState) => {
+  const changeFanLevel = async (nextLevel) => {
     if (mode === "auto") return;
 
     try {
-      const fanCommand = nextState ? 1 : 0;
-      await sendControlCommand("ventilation_fan", fanCommand);
-      setFanLevel(fanCommand);
+      await sendControlCommand("ventilation_fan", nextLevel);
+      setFanLevel(nextLevel);
       setControlMessage(
-        nextState ? "환기팬을 켰습니다." : "환기팬을 껐습니다.",
+        nextLevel > 0
+          ? `환기팬을 ${nextLevel}단으로 설정했습니다.`
+          : "환기팬을 정지했습니다.",
       );
     } catch (error) {
       setControlMessage(error.message);
     }
   };
 
-  const toggleSprayer = async () => {
-    const nextState = !isSpraying;
+  const changeSprayerState = async (nextState) => {
+    if (mode === "auto") return;
 
     try {
-      await sendControlCommand("water_sprayer", nextState);
+      const durationSeconds = nextState ? sprayerDurationHours * 60 * 60 : 0;
+      await sendControlCommand("water_sprayer", nextState, durationSeconds);
       setIsSpraying(nextState);
-
-      if (sprayTimerRef.current) window.clearTimeout(sprayTimerRef.current);
-
-      if (nextState) {
-        setControlMessage("살수 장치를 작동했습니다. 30초 후 자동 정지합니다.");
-        sprayTimerRef.current = window.setTimeout(async () => {
-          setIsSpraying(false);
-          setControlMessage("30초 살수가 완료되었습니다.");
-          try {
-            await sendControlCommand("water_sprayer", false);
-          } catch {
-            setControlMessage("살수 자동 정지 명령을 확인해 주세요.");
-          }
-        }, 30000);
-      } else {
-        setControlMessage("살수 장치를 정지했습니다.");
-      }
+      setSprayerStopAt(
+        nextState ? new Date(Date.now() + durationSeconds * 1000) : null,
+      );
+      setControlMessage(
+        nextState
+          ? `살수 장치를 ${sprayerDurationHours}시간 동안 작동합니다.`
+          : "살수 장치를 정지했습니다.",
+      );
     } catch (error) {
       setControlMessage(error.message);
     }
@@ -516,23 +531,18 @@ function BarnEnvironmentControl({ user }) {
                 {fanLevel > 0 ? "ON" : "OFF"}
               </span>
             </div>
-            <div className="fan-level-buttons" role="group" aria-label="환기팬 전원">
-              <button
-                className={fanLevel > 0 ? "active" : ""}
-                type="button"
-                disabled={mode === "auto"}
-                onClick={() => changeFanState(true)}
-              >
-                팬 켜기
-              </button>
-              <button
-                className={fanLevel === 0 ? "active" : ""}
-                type="button"
-                disabled={mode === "auto"}
-                onClick={() => changeFanState(false)}
-              >
-                팬 끄기
-              </button>
+            <div className="fan-level-buttons" role="group" aria-label="환기팬 단계">
+              {[0, 1, 2, 3].map((level) => (
+                <button
+                  className={fanLevel === level ? "active" : ""}
+                  type="button"
+                  disabled={mode === "auto"}
+                  key={level}
+                  onClick={() => changeFanLevel(level)}
+                >
+                  {level === 0 ? "정지" : `${level}단`}
+                </button>
+              ))}
             </div>
             {mode === "auto" && <p className="auto-control-hint">수동 조작은 수동 모드에서 사용할 수 있습니다.</p>}
           </article>
@@ -547,14 +557,33 @@ function BarnEnvironmentControl({ user }) {
                 {isSpraying ? "살수 중" : "대기"}
               </span>
             </div>
+            <label className="actuator-duration-select">
+              <span>수동 작동 시간</span>
+              <select
+                value={sprayerDurationHours}
+                disabled={mode === "auto" || isSpraying}
+                onChange={(event) => setSprayerDurationHours(Number(event.target.value))}
+              >
+                {MANUAL_DURATION_OPTIONS.map((option) => (
+                  <option key={option.hours} value={option.hours}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
               className={`sprayer-button ${isSpraying ? "stop" : ""}`}
               type="button"
               disabled={mode === "auto"}
-              onClick={toggleSprayer}
+              onClick={() => changeSprayerState(!isSpraying)}
             >
-              {isSpraying ? "살수 정지" : "30초 살수 시작"}
+              {isSpraying ? "살수 정지" : `${sprayerDurationHours}시간 살수 시작`}
             </button>
+            {sprayerStopAt && (
+              <p className="auto-control-hint">
+                예약 종료: {sprayerStopAt.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
+              </p>
+            )}
             {mode === "auto" && <p className="auto-control-hint">고온 조건에서 자동으로 살수합니다.</p>}
           </article>
         </div>

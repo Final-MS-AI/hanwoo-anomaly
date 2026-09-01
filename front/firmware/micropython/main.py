@@ -28,8 +28,9 @@ except AttributeError:
 
 DHT_PIN = 32
 GAS_PIN = 35
-MOTOR_PIN_NUMBERS = (33, 25, 26, 27)
-FIRMWARE_VERSION = "cowow-micropython-iothub-3.0.0"
+# ULN2003 드라이버의 IN1~IN4에 연결한 ESP32 GPIO 순서
+MOTOR_PIN_NUMBERS = (27, 26, 25, 33)
+FIRMWARE_VERSION = "cowow-micropython-iothub-3.1.0"
 
 HEARTBEAT_INTERVAL_MS = 20000
 SENSOR_INTERVAL_MS = 30000
@@ -60,6 +61,7 @@ wlan.active(True)
 
 fan_level = 0
 water_sprayer_on = False
+water_sprayer_stop_at = None
 motor_step_index = 0
 last_heartbeat_at = 0
 last_sensor_at = 0
@@ -153,6 +155,37 @@ def set_fan_level(level):
         print("스텝모터 회전:", fan_level, "단계")
 
 
+def set_water_sprayer(enabled, duration_seconds=0):
+    global water_sprayer_on, water_sprayer_stop_at
+
+    water_sprayer_on = bool(enabled)
+    try:
+        duration_seconds = max(0, int(duration_seconds or 0))
+    except (TypeError, ValueError):
+        duration_seconds = 0
+
+    water_sprayer_stop_at = (
+        time.ticks_add(time.ticks_ms(), duration_seconds * 1000)
+        if water_sprayer_on and duration_seconds > 0
+        else None
+    )
+    print(
+        "물 뿌리기:",
+        "ON" if water_sprayer_on else "OFF",
+        "기간(초):",
+        duration_seconds,
+    )
+
+
+def apply_sprayer_schedule():
+    if (
+        water_sprayer_stop_at is not None
+        and time.ticks_diff(time.ticks_ms(), water_sprayer_stop_at) >= 0
+    ):
+        print("살수 예약 시간이 종료되었습니다.")
+        set_water_sprayer(False)
+
+
 def motor_worker():
     global motor_step_index
 
@@ -215,20 +248,22 @@ def handle_iot_command(method, payload):
     if method == "setActuator":
         actuator = payload.get("actuator")
         value = payload.get("value")
+        duration_seconds = payload.get("durationSeconds", 0)
     elif method == "setFanLevel":
         actuator = "ventilation_fan"
         value = payload.get("value", 0)
+        duration_seconds = 0
     elif method == "setWaterSprayer":
         actuator = "water_sprayer"
         value = payload.get("value", False)
+        duration_seconds = payload.get("durationSeconds", 0)
     else:
         raise ValueError("unknown method")
 
     if actuator == "ventilation_fan":
         set_fan_level(value)
     elif actuator == "water_sprayer":
-        water_sprayer_on = bool(value)
-        print("물 뿌리기:", "ON" if water_sprayer_on else "OFF")
+        set_water_sprayer(value, duration_seconds)
     else:
         raise ValueError("unknown actuator")
 
@@ -334,6 +369,7 @@ if wlan.isconnected():
 try:
     while True:
         now = time.ticks_ms()
+        apply_sprayer_schedule()
 
         if not wlan.isconnected():
             disconnect_iot_hub()
