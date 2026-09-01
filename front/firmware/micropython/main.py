@@ -9,7 +9,7 @@ import ntptime
 import ujson
 from machine import ADC, Pin
 
-from azure_iot import AzureIoTHub
+from iot import AzureIoTHub
 
 from config import (
     DEVICE_ID,
@@ -28,8 +28,8 @@ except AttributeError:
 
 DHT_PIN = 32
 GAS_PIN = 35
-# ULN2003 드라이버의 IN1~IN4에 연결한 ESP32 GPIO 순서
-MOTOR_PIN_NUMBERS = (27, 26, 25, 33)
+HUMIDIFIER_RELAY_PIN = 14
+MOTOR_PIN_NUMBERS = (33, 25, 26, 27)
 FIRMWARE_VERSION = "cowow-micropython-iothub-3.1.0"
 
 HEARTBEAT_INTERVAL_MS = 20000
@@ -55,6 +55,7 @@ gas_sensor = ADC(Pin(GAS_PIN))
 gas_sensor.atten(ADC.ATTN_11DB)
 gas_sensor.width(ADC.WIDTH_12BIT)
 motor_pins = [Pin(number, Pin.OUT) for number in MOTOR_PIN_NUMBERS]
+humidifier_relay = Pin(HUMIDIFIER_RELAY_PIN, Pin.OUT, value=0)
 
 wlan = network.WLAN(network.STA_IF)
 wlan.active(True)
@@ -155,10 +156,18 @@ def set_fan_level(level):
         print("스텝모터 회전:", fan_level, "단계")
 
 
-def set_water_sprayer(enabled, duration_seconds=0):
+def normalize_switch_value(value):
+    if isinstance(value, str):
+        return value.lower() in ("1", "true", "on", "yes")
+    return bool(value)
+
+
+def set_humidifier(enabled, duration_seconds=0):
     global water_sprayer_on, water_sprayer_stop_at
 
-    water_sprayer_on = bool(enabled)
+    water_sprayer_on = normalize_switch_value(enabled)
+    # 현재 릴레이 기준: HIGH(1) = ON, LOW(0) = OFF
+    humidifier_relay.value(1 if water_sprayer_on else 0)
     try:
         duration_seconds = max(0, int(duration_seconds or 0))
     except (TypeError, ValueError):
@@ -170,7 +179,7 @@ def set_water_sprayer(enabled, duration_seconds=0):
         else None
     )
     print(
-        "물 뿌리기:",
+        "가습기 릴레이:",
         "ON" if water_sprayer_on else "OFF",
         "기간(초):",
         duration_seconds,
@@ -183,7 +192,7 @@ def apply_sprayer_schedule():
         and time.ticks_diff(time.ticks_ms(), water_sprayer_stop_at) >= 0
     ):
         print("살수 예약 시간이 종료되었습니다.")
-        set_water_sprayer(False)
+        set_humidifier(False)
 
 
 def motor_worker():
@@ -257,13 +266,18 @@ def handle_iot_command(method, payload):
         actuator = "water_sprayer"
         value = payload.get("value", False)
         duration_seconds = payload.get("durationSeconds", 0)
+    elif method == "setHumidifier":
+        actuator = "humidifier"
+        value = payload.get("value", False)
+        duration_seconds = payload.get("durationSeconds", 0)
     else:
         raise ValueError("unknown method")
 
     if actuator == "ventilation_fan":
         set_fan_level(value)
-    elif actuator == "water_sprayer":
-        set_water_sprayer(value, duration_seconds)
+    elif actuator in ("water_sprayer", "humidifier"):
+        # 현재 살수/냉각 장치는 GPIO14 릴레이로 제어합니다.
+        set_humidifier(value, duration_seconds)
     else:
         raise ValueError("unknown actuator")
 
@@ -271,6 +285,7 @@ def handle_iot_command(method, payload):
         "ok": True,
         "fanLevel": fan_level,
         "waterSprayer": water_sprayer_on,
+        "humidifier": water_sprayer_on,
     }
 
 
@@ -325,6 +340,7 @@ def send_heartbeat():
             "wifiRssi": get_wifi_rssi(),
             "fanLevel": fan_level,
             "waterSprayer": water_sprayer_on,
+            "humidifier": water_sprayer_on,
         }
     ):
         print("IoT Hub Heartbeat 전송 완료")
@@ -344,6 +360,7 @@ def send_telemetry():
             "wifiRssi": get_wifi_rssi(),
             "fanLevel": fan_level,
             "waterSprayer": water_sprayer_on,
+            "humidifier": water_sprayer_on,
         }
     ):
         print("IoT Hub Telemetry 전송 완료")
@@ -354,6 +371,8 @@ print("장치 ID:", DEVICE_ID)
 print("IoT Hub:", IOT_HUB_HOSTNAME)
 print("펌웨어:", FIRMWARE_VERSION)
 
+set_humidifier(False)
+humidifier_relay.value(0)
 release_motor()
 _thread.start_new_thread(motor_worker, ())
 connect_wifi()
@@ -412,6 +431,8 @@ except KeyboardInterrupt:
     print("프로그램 중지")
 finally:
     disconnect_iot_hub()
+    set_humidifier(False)
+    humidifier_relay.value(0)
     fan_level = 0
     time.sleep_ms(50)
     release_motor()
