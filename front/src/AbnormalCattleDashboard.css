@@ -535,14 +535,6 @@
   margin-top: 3px;
 }
 
-.recent-behavior-video-note {
-  display: block;
-  margin-top: 8px;
-  color: #8a8179;
-  font-size: 11px;
-  line-height: 1.5;
-}
-
 .dashboard-alert-feedback {
   display: grid;
   gap: 10px;
@@ -1919,12 +1911,12 @@
 
 @media (max-width: 640px) {
   .dashboard-analysis-modal {
-    padding: 12px;
+    padding: 32px 12px 12px;
   }
 
   .dashboard-analysis-modal-card {
     width: 100%;
-    max-height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 44px);
     padding: 16px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;

@@ -196,7 +196,9 @@ function LoginPage({ user, setUser }) {
                   src="/google-g-logo.svg"
                   alt=""
                 />
-                <span>{isGoogleLoggingIn ? "로그인 중" : "로그인"}</span>
+                <span className={isGoogleLoggingIn ? "google-login-loading-text" : undefined}>
+                  {isGoogleLoggingIn ? "로그인 중" : "로그인"}
+                </span>
               </button>
             ) : GOOGLE_CLIENT_ID ? (
               <GoogleLogin
@@ -1032,7 +1034,20 @@ function App() {
   if (user === undefined) {
     return (
       <main className="page auth-loading-page">
-        <p>로그인 상태를 확인하고 있습니다.</p>
+        <div className="auth-loading-content" role="status" aria-live="polite">
+          <img
+            className="auth-loading-logo"
+            src="/cowow-logo.png?v=20260811-1"
+            alt="COWOW"
+          />
+          <img
+            className="auth-loading-bull"
+            src="/cowow-bull.png?v=20260811-1"
+            alt=""
+            aria-hidden="true"
+          />
+          <p>로그인 상태를 확인하고 있습니다.</p>
+        </div>
       </main>
     );
   }

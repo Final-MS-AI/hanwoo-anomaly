@@ -293,11 +293,6 @@ function RecentBehaviorCard({ cattle, onOpenImage, onOpenVideo, isGuest = false 
             </button>
             <DashboardAlertFeedback cattle={cattle} />
           </div>
-          {cattle.videoUrl && (
-            <small className="recent-behavior-video-note">
-              감지 영상은 행동이 감지된 시점 전후의 짧은 영상입니다. 영상 전체 구간에서 같은 행동이 지속된다는 의미는 아닙니다.
-            </small>
-          )}
         </>
       )}
     </article>
