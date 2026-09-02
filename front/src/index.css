@@ -222,6 +222,38 @@ h1 {
   color: #654321;
 }
 
+.auth-loading-content {
+  display: flex;
+  width: min(92vw, 360px);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.auth-loading-logo {
+  display: block;
+  width: min(72vw, 260px);
+  height: auto;
+  object-fit: contain;
+}
+
+.auth-loading-bull {
+  display: block;
+  width: min(34vw, 120px);
+  height: auto;
+  margin-top: -8px;
+  object-fit: contain;
+}
+
+.auth-loading-content p {
+  margin: 14px 0 0;
+  color: #654321;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
 .guest-profile {
   width: 72px;
   height: 72px;
