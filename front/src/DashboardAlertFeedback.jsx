@@ -16,12 +16,12 @@ function behaviorLabel(value) {
   const key = String(value || "").trim().toLowerCase();
   if (!key) return "행동 정보 없음";
   if (key.includes("standing")) return "서 있음";
+  if (key.includes("head_down")) return "서 있음";
   if (key.includes("lying")) return "누워 있음";
   if (key.includes("walking")) return "걷는 중";
   if (
     key.includes("feeding") ||
     key.includes("eating") ||
-    key.includes("head_down") ||
     key.includes("섭식")
   ) {
     return "섭식 중";
